@@ -2,22 +2,7 @@
  * Simple in-memory rate limiter using sliding window
  */
 
-interface RateLimitEntry {
-    count: number;
-    resetAt: number;
-}
-
-const rateLimitMap = new Map<string, RateLimitEntry>();
-
-// Clean up old entries periodically
-setInterval(() => {
-    const now = Date.now();
-    for (const [key, entry] of rateLimitMap) {
-        if (entry.resetAt < now) {
-            rateLimitMap.delete(key);
-        }
-    }
-}, 60000); // Cleanup every minute
+import { getDb } from "./firebase-admin";
 
 export interface RateLimitConfig {
     maxRequests: number;
@@ -31,60 +16,99 @@ export interface RateLimitResult {
 }
 
 /**
- * Check rate limit for a given identifier (e.g., IP address)
+ * Check rate limit using Firestore
  */
-export function checkRateLimit(
+export async function checkRateLimit(
     identifier: string,
     config: RateLimitConfig
-): RateLimitResult {
+): Promise<RateLimitResult> {
     const now = Date.now();
-    const key = identifier;
+    const cleanIdentifier = identifier.replace(/[^a-zA-Z0-9]/g, "_"); // Sanitize for doc ID
+    const db = getDb();
+    const docRef = db.collection("rate_limits").doc(cleanIdentifier);
 
-    let entry = rateLimitMap.get(key);
+    try {
+        const result = await db.runTransaction(async (t) => {
+            const doc = await t.get(docRef);
+            const data = doc.data();
 
-    // If no entry or window expired, create new
-    if (!entry || entry.resetAt < now) {
-        entry = {
-            count: 0,
+            let count = 0;
+            let resetAt = now + config.windowMs;
+
+            if (doc.exists && data) {
+                if (data.resetAt > now) {
+                    // Window still active
+                    count = data.count;
+                    resetAt = data.resetAt;
+                } else {
+                    // Window expired, reset
+                    count = 0;
+                    resetAt = now + config.windowMs;
+                }
+            }
+
+            if (count >= config.maxRequests) {
+                return {
+                    success: false,
+                    remaining: 0,
+                    resetAt,
+                };
+            }
+
+            count++;
+
+            t.set(docRef, { count, resetAt });
+
+            return {
+                success: true,
+                remaining: config.maxRequests - count,
+                resetAt,
+            };
+        });
+
+        return result;
+    } catch (error) {
+        console.error("Rate limit check failed:", error);
+        // Fail open to avoid blocking users if DB fails
+        return {
+            success: true,
+            remaining: 1,
             resetAt: now + config.windowMs,
         };
-        rateLimitMap.set(key, entry);
     }
-
-    // Check if over limit
-    if (entry.count >= config.maxRequests) {
-        return {
-            success: false,
-            remaining: 0,
-            resetAt: entry.resetAt,
-        };
-    }
-
-    // Increment count
-    entry.count++;
-
-    return {
-        success: true,
-        remaining: config.maxRequests - entry.count,
-        resetAt: entry.resetAt,
-    };
 }
 
+import { NextRequest } from "next/server";
+
 /**
- * Get client IP from request headers
+ * Get client IP from request
  */
-export function getClientIP(request: Request): string {
-    // Check various headers for IP
-    const forwardedFor = request.headers.get("x-forwarded-for");
-    if (forwardedFor) {
-        return forwardedFor.split(",")[0].trim();
+export function getClientIP(request: Request | NextRequest): string {
+    // 1. Try Next.js built-in IP (works on Vercel, etc.)
+    const req = request as any;
+    if (req.ip) {
+        return req.ip;
     }
 
-    const realIP = request.headers.get("x-real-ip");
-    if (realIP) {
-        return realIP;
+    // 2. Check headers
+    const headers = request.headers;
+
+    const xForwardedFor = headers.get("x-forwarded-for");
+    if (xForwardedFor) {
+        // The first IP is the client IP
+        return xForwardedFor.split(",")[0].trim();
     }
 
-    // Fallback
-    return "unknown";
+    const cfConnectingIp = headers.get("cf-connecting-ip");
+    if (cfConnectingIp) {
+        return cfConnectingIp;
+    }
+
+    const realIp = headers.get("x-real-ip");
+    if (realIp) {
+        return realIp;
+    }
+
+    // Fallback for local development
+    return "127.0.0.1";
 }
