@@ -2,6 +2,35 @@ import { RawPost } from "@/types/pulse";
 
 const USER_AGENT = "PainPulse/1.0 (Market Research Tool)";
 
+// Intent-augmented query suffixes to find high-signal posts
+const INTENT_QUERIES = [
+    "", // base query
+    "alternative",
+    "recommend",
+    "pricing",
+    "too expensive",
+    "problem",
+    "doesn't work",
+    "looking for",
+    "best app",
+    "frustrating",
+    "hate",
+];
+
+// Meme/low-signal indicators to filter out
+const MEME_INDICATORS = [
+    "lol",
+    "lmao",
+    "meme",
+    "shitpost",
+    "circlejerk",
+    "copypasta",
+    "satire",
+    "joke",
+    "funny",
+    "haha",
+];
+
 interface RedditPost {
     data: {
         id: string;
@@ -14,6 +43,7 @@ interface RedditPost {
         created_utc: number;
         subreddit: string;
         author: string;
+        is_self: boolean;
     };
 }
 
@@ -29,15 +59,10 @@ interface RedditSearchResponse {
  */
 async function fetchRedditPage(
     query: string,
-    timeFilter: string,
-    after?: string
-): Promise<{ posts: RawPost[]; after: string | null }> {
+    timeFilter: string
+): Promise<RawPost[]> {
     const encodedQuery = encodeURIComponent(query);
-    let url = `https://www.reddit.com/search.json?q=${encodedQuery}&sort=relevance&t=${timeFilter}&limit=100`;
-
-    if (after) {
-        url += `&after=${after}`;
-    }
+    const url = `https://www.reddit.com/search.json?q=${encodedQuery}&sort=relevance&t=${timeFilter}&limit=50`;
 
     try {
         const response = await fetch(url, {
@@ -48,12 +73,12 @@ async function fetchRedditPage(
 
         if (!response.ok) {
             console.error(`Reddit API error: ${response.status}`);
-            return { posts: [], after: null };
+            return [];
         }
 
         const data: RedditSearchResponse = await response.json();
 
-        const posts = data.data.children.map((post) => ({
+        return data.data.children.map((post) => ({
             id: post.data.id,
             title: post.data.title,
             body: post.data.selftext || "",
@@ -64,54 +89,124 @@ async function fetchRedditPage(
             createdAt: new Date(post.data.created_utc * 1000),
             subreddit: post.data.subreddit,
             author: post.data.author,
+            isSelf: post.data.is_self,
         }));
-
-        return { posts, after: data.data.after };
     } catch (error) {
         console.error("Failed to fetch Reddit page:", error);
-        return { posts: [], after: null };
+        return [];
     }
 }
 
 /**
- * Fetch posts from Reddit search API with pagination
- * Fetches up to 300 posts across multiple time windows for better analysis
+ * Check if post is a meme/low-signal content
+ */
+function isMemePost(post: RawPost): boolean {
+    const text = `${post.title} ${post.body} ${post.subreddit}`.toLowerCase();
+    return MEME_INDICATORS.some((indicator) => text.includes(indicator));
+}
+
+/**
+ * Check if post has enough signal (not just a title)
+ */
+function hasEnoughContent(post: RawPost): boolean {
+    const totalLength = post.title.length + post.body.length;
+    // Require at least 80 chars total, or if no body, title must be substantial
+    if (totalLength < 80 && post.body.length < 20) {
+        return false;
+    }
+    return true;
+}
+
+/**
+ * Generate dedupe signature for a post
+ */
+function getDedupeSignature(post: RawPost): string {
+    const normalized = post.title
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 80);
+    return normalized;
+}
+
+/**
+ * Deduplicate posts, keeping the one with highest engagement
+ */
+function deduplicatePosts(posts: RawPost[]): RawPost[] {
+    const signatureMap = new Map<string, RawPost>();
+
+    for (const post of posts) {
+        const sig = getDedupeSignature(post);
+        const existing = signatureMap.get(sig);
+
+        if (!existing) {
+            signatureMap.set(sig, post);
+        } else {
+            // Keep the one with higher engagement
+            const existingScore = existing.score + existing.comments * 2;
+            const newScore = post.score + post.comments * 2;
+            if (newScore > existingScore) {
+                signatureMap.set(sig, post);
+            }
+        }
+    }
+
+    return Array.from(signatureMap.values());
+}
+
+/**
+ * Fetch posts from Reddit using intent-augmented queries
+ * This dramatically improves signal quality
  */
 export async function fetchRedditPosts(query: string): Promise<RawPost[]> {
     const allPosts: RawPost[] = [];
     const seenIds = new Set<string>();
 
-    // Fetch from different time windows to get more diverse data
-    const timeFilters = ["week", "month"];
+    // Build intent-augmented queries
+    const queries = INTENT_QUERIES.map((suffix) =>
+        suffix ? `${query} ${suffix}` : query
+    );
 
-    for (const timeFilter of timeFilters) {
-        let after: string | undefined;
-        let pages = 0;
-        const maxPages = 1; // 1 page × 100 posts × 2 filters = ~150 unique
+    // Fetch from a subset of intent queries to stay within rate limits
+    // Use 6 most important queries
+    const priorityQueries = queries.slice(0, 6);
 
-        while (pages < maxPages) {
-            // Add delay between requests to avoid rate limiting
-            if (pages > 0 || timeFilter !== "week") {
-                await new Promise((resolve) => setTimeout(resolve, 500));
+    for (let i = 0; i < priorityQueries.length; i++) {
+        const q = priorityQueries[i];
+
+        // Add delay between requests (500ms)
+        if (i > 0) {
+            await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+
+        const posts = await fetchRedditPage(q, "week");
+
+        for (const post of posts) {
+            if (!seenIds.has(post.id)) {
+                seenIds.add(post.id);
+                allPosts.push(post);
             }
-
-            const result = await fetchRedditPage(query, timeFilter, after);
-
-            for (const post of result.posts) {
-                if (!seenIds.has(post.id)) {
-                    seenIds.add(post.id);
-                    allPosts.push(post);
-                }
-            }
-
-            if (!result.after) break;
-            after = result.after;
-            pages++;
         }
     }
 
-    console.log(`Reddit: Fetched ${allPosts.length} unique posts`);
-    return allPosts;
+    // Apply hard filters
+    const filtered = allPosts.filter((post) => {
+        // Filter out memes
+        if (isMemePost(post)) return false;
+        // Filter out low-content posts
+        if (!hasEnoughContent(post)) return false;
+        return true;
+    });
+
+    // Deduplicate
+    const deduped = deduplicatePosts(filtered);
+
+    console.log(
+        `Reddit: Fetched ${allPosts.length} raw → ${filtered.length} filtered → ${deduped.length} unique`
+    );
+
+    return deduped;
 }
 
 /**

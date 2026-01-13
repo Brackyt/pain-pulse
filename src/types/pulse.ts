@@ -62,6 +62,7 @@ export interface PulseReport {
     themes: Theme[];
     sourceBreakdown: SourceBreakdown;
     buildIdeas: BuildIdea[];
+    bestQuotes: string[]; // High-quality quotes from comments
 }
 
 // Raw post data from sources
@@ -76,6 +77,7 @@ export interface RawPost {
     createdAt: Date;
     subreddit?: string; // Reddit only
     author?: string;
+    isSelf?: boolean; // Reddit: true if self post
 }
 
 // Firestore serializable version (with timestamps as numbers)
@@ -91,4 +93,5 @@ export interface PulseReportFirestore {
     themes: Theme[];
     sourceBreakdown: SourceBreakdown;
     buildIdeas: BuildIdea[];
+    bestQuotes: string[];
 }

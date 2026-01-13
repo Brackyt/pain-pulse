@@ -24,7 +24,7 @@ export function ThemesList({ themes }: ThemesListProps) {
             <div className="space-y-6">
                 {themes.map((theme, index) => (
                     <div
-                        key={theme.title}
+                        key={`${index}-${theme.title}`}
                         className="relative pl-8 border-l-2 border-white/10 hover:border-white/30 transition-colors"
                     >
                         {/* Rank badge */}

@@ -2,43 +2,70 @@ import { RawPost, PulseStats, PainSpike } from "@/types/pulse";
 import { analyzePost } from "./signals";
 
 /**
+ * Calculate robust engagement score with log scaling
+ * engagement = log(1 + upvotes) + 0.8*log(1 + comments)
+ */
+function getEngagementScore(post: RawPost): number {
+    return Math.log(1 + post.score) + 0.8 * Math.log(1 + post.comments);
+}
+
+/**
+ * Calculate recency boost (exponential decay)
+ * recency = exp(-hours_since_post / 72)
+ */
+function getRecencyBoost(post: RawPost): number {
+    const hoursSincePost = (Date.now() - post.createdAt.getTime()) / (1000 * 60 * 60);
+    return Math.exp(-hoursSincePost / 72);
+}
+
+/**
+ * Calculate post weight: engagement * (0.6 + 0.4*recency)
+ */
+function getPostWeight(post: RawPost): number {
+    const engagement = getEngagementScore(post);
+    const recency = getRecencyBoost(post);
+    return engagement * (0.6 + 0.4 * recency);
+}
+
+/**
+ * Sigmoid function for capping scores
+ */
+function sigmoid(x: number): number {
+    return 1 / (1 + Math.exp(-x));
+}
+
+/**
  * Calculate Pain Index (0-100)
- * Based on weighted pain signals + engagement across all posts
+ * Uses weighted patterns with caps and sigmoid normalization
  */
 export function calculatePainIndex(posts: RawPost[]): number {
     if (posts.length === 0) return 0;
 
-    let postsWithPain = 0;
-    let totalWeightedPain = 0;
+    let totalPainScore = 0;
+    let totalWeight = 0;
 
     for (const post of posts) {
         const { painScore } = analyzePost(post);
+        const weight = getPostWeight(post);
 
-        if (painScore > 0) {
-            postsWithPain++;
-            // Weight by engagement (log scale to prevent outliers)
-            const engagement = Math.log10(Math.max(1, post.score + post.comments * 2));
-            totalWeightedPain += painScore * (1 + engagement * 0.2);
-        }
+        // Cap pain score at 8, then apply sigmoid
+        const cappedPain = Math.min(painScore, 8);
+        const normalizedPain = sigmoid(cappedPain - 2); // Shift so 2+ pain = >0.5
+
+        totalPainScore += weight * normalizedPain;
+        totalWeight += weight;
     }
 
-    if (postsWithPain === 0) return 0;
+    if (totalWeight === 0) return 0;
 
-    // Pain density: what % of posts have pain signals
-    const painDensity = (postsWithPain / posts.length) * 100;
-
-    // Average pain intensity per painful post
-    const avgPainIntensity = totalWeightedPain / postsWithPain;
-
-    // Combine: 60% density, 40% intensity, normalized
-    const rawScore = (painDensity * 0.6) + (Math.min(avgPainIntensity, 20) * 2);
-
-    return Math.min(100, Math.round(rawScore));
+    // Average weighted pain, scale to 0-100
+    const avgPain = totalPainScore / totalWeight;
+    return Math.min(100, Math.round(avgPain * 100));
 }
 
 /**
  * Calculate Opportunity Score (0-100)
- * High score = lots of pain + buyer intent + growing trend
+ * opportunity = weight * sigmoid(pain) * sigmoid(intent)
  */
 export function calculateOpportunityScore(
     posts: RawPost[],
@@ -46,46 +73,46 @@ export function calculateOpportunityScore(
 ): number {
     if (posts.length === 0) return 0;
 
-    let postsWithBuyerIntent = 0;
-    let totalBuyerWeight = 0;
+    let totalOpportunity = 0;
+    let totalWeight = 0;
+    let postsWithIntent = 0;
 
     for (const post of posts) {
-        const { buyerScore } = analyzePost(post);
+        const { painScore, buyerScore } = analyzePost(post);
+        const weight = getPostWeight(post);
 
-        if (buyerScore > 0) {
-            postsWithBuyerIntent++;
-            totalBuyerWeight += buyerScore;
-        }
+        // Cap scores at 8
+        const cappedPain = Math.min(painScore, 8);
+        const cappedIntent = Math.min(buyerScore, 8);
+
+        // Apply sigmoid
+        const painSig = sigmoid(cappedPain - 2);
+        const intentSig = sigmoid(cappedIntent - 2);
+
+        // Opportunity is the product of pain and intent
+        const opportunity = painSig * intentSig;
+
+        totalOpportunity += weight * opportunity;
+        totalWeight += weight;
+
+        if (buyerScore > 0) postsWithIntent++;
     }
 
-    // Buyer intent density
-    const buyerDensity = (postsWithBuyerIntent / posts.length) * 100;
+    if (totalWeight === 0) return 0;
 
-    // Trend velocity: recent posts vs older
-    const now = Date.now();
-    const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
-    const recentPosts = posts.filter((p) => p.createdAt.getTime() > weekAgo);
-    const recentRatio = posts.length > 0 ? (recentPosts.length / posts.length) : 0;
-    const trendBonus = recentRatio > 0.3 ? 15 : recentRatio > 0.15 ? 8 : 0;
+    // Factor in the density of buyer intent posts
+    const intentDensity = postsWithIntent / posts.length;
 
-    // Combine factors
-    // - Pain is essential (40%)
-    // - Buyer intent is key (35%)  
-    // - Trend momentum (15%)
-    // - Volume bonus if > 100 posts (10%)
-    const volumeBonus = posts.length > 200 ? 10 : posts.length > 100 ? 5 : 0;
-
-    const rawScore =
-        (painIndex * 0.4) +
-        (buyerDensity * 0.35) +
-        trendBonus +
-        volumeBonus;
+    // Combine weighted opportunity with intent density
+    const avgOpportunity = totalOpportunity / totalWeight;
+    const rawScore = (avgOpportunity * 70) + (intentDensity * 30);
 
     return Math.min(100, Math.round(rawScore));
 }
 
 /**
- * Calculate pain spikes (actual date-based comparison)
+ * Calculate pain spikes with proper baseline comparison
+ * spike = (count_7d + 1) / (count_30d/4 + 1)
  */
 export function calculatePainSpikes(posts: RawPost[]): PainSpike {
     const now = Date.now();
@@ -98,18 +125,12 @@ export function calculatePainSpikes(posts: RawPost[]): PainSpike {
     const weeklyVolume = weeklyPosts.length;
     const monthlyVolume = monthlyPosts.length;
 
-    // Calculate week-over-week change
-    // Compare this week's pace to average weekly pace over the month
-    const prevWeeksAvg = monthlyVolume > weeklyVolume
-        ? (monthlyVolume - weeklyVolume) / 3 // Remaining 3 weeks average
-        : monthlyVolume / 4;
-
-    let deltaPercent = 0;
-    if (prevWeeksAvg > 0) {
-        deltaPercent = Math.round(((weeklyVolume - prevWeeksAvg) / prevWeeksAvg) * 100);
-    } else if (weeklyVolume > 0) {
-        deltaPercent = 100; // All activity is new
-    }
+    // Proper spike calculation:
+    // spike = (count_7d + 1) / (count_30d/4 + 1)
+    const weeklyCount = weeklyVolume + 1;
+    const monthlyAvgPerWeek = monthlyVolume / 4 + 1;
+    const spikeRatio = weeklyCount / monthlyAvgPerWeek;
+    const deltaPercent = Math.round((spikeRatio - 1) * 100);
 
     return {
         weeklyVolume,

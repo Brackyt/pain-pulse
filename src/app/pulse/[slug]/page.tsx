@@ -7,6 +7,7 @@ import { MetricCard } from "@/components/pulse/metric-card";
 import { PainSpikes } from "@/components/pulse/pain-spikes";
 import { ThemesList } from "@/components/pulse/themes-list";
 import { QuotesSection } from "@/components/pulse/quotes-section";
+import { BestQuotes } from "@/components/pulse/best-quotes";
 import { BuildIdeas } from "@/components/pulse/build-ideas";
 import { SourcesBreakdown } from "@/components/pulse/sources-breakdown";
 import { ShareButtons } from "@/components/pulse/share-buttons";
@@ -163,6 +164,13 @@ export default async function PulsePage({ params }: PageProps) {
                     {/* Top Phrases */}
                     <QuotesSection phrases={report.topPhrases} />
                 </div>
+
+                {/* Best Quotes from Comments */}
+                {report.bestQuotes && report.bestQuotes.length > 0 && (
+                    <section className="mb-12">
+                        <BestQuotes quotes={report.bestQuotes} />
+                    </section>
+                )}
 
                 {/* Build Ideas */}
                 <section className="mb-12">

@@ -4,6 +4,7 @@ import { queryToSlug, isValidSlug } from "@/lib/slug";
 import { checkRateLimit, getClientIP } from "@/lib/rate-limit";
 import { fetchRedditPosts, getSubredditBreakdown } from "@/lib/sources/reddit";
 import { fetchHNPosts, getHNBreakdown } from "@/lib/sources/hacker-news";
+import { fetchBestQuotes } from "@/lib/sources/reddit-comments";
 import { calculateStats, calculatePainSpikes } from "@/lib/analysis/scoring";
 import { clusterThemes } from "@/lib/analysis/clustering";
 import { generateBuildIdeas } from "@/lib/analysis/ideas";
@@ -38,10 +39,7 @@ export async function GET(request: NextRequest) {
         const doc = await docRef.get();
 
         if (!doc.exists) {
-            return NextResponse.json(
-                { error: "Report not found" },
-                { status: 404 }
-            );
+            return NextResponse.json({ error: "Report not found" }, { status: 404 });
         }
 
         const data = doc.data() as PulseReportFirestore;
@@ -140,6 +138,8 @@ export async function POST(request: NextRequest) {
             }
         }
 
+        console.log(`Generating report for: ${query}`);
+
         // Fetch data from sources in parallel (with partial failure tolerance)
         const [redditPosts, hnPosts] = await Promise.all([
             fetchRedditPosts(query).catch((e) => {
@@ -161,18 +161,34 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Compute metrics
+        console.log(`Total posts: ${allPosts.length}`);
+
+        // Compute basic metrics (fast)
         const stats = calculateStats(allPosts);
         const painSpikes = calculatePainSpikes(allPosts);
         const topPhrases = extractTopPhrases(allPosts);
-        const themes = clusterThemes(allPosts);
-        const buildIdeas = generateBuildIdeas(themes, query);
 
-        // Source breakdown
+        // Source breakdown (fast)
         const sourceBreakdown = {
             reddit: getSubredditBreakdown(redditPosts),
             hackernews: getHNBreakdown(hnPosts),
         };
+
+        // Fetch best quotes from Reddit comments (parallel with embeddings)
+        // AND run embedding-based clustering
+        const [bestQuotes, themes] = await Promise.all([
+            fetchBestQuotes(redditPosts, 10, 10).catch((e) => {
+                console.error("Quote extraction failed:", e);
+                return [];
+            }),
+            clusterThemes(allPosts, 5).catch((e) => {
+                console.error("Clustering failed:", e);
+                return [];
+            }),
+        ]);
+
+        // Generate build ideas based on themes
+        const buildIdeas = generateBuildIdeas(themes, query);
 
         const now = Date.now();
         const reportFirestore: PulseReportFirestore = {
@@ -189,6 +205,7 @@ export async function POST(request: NextRequest) {
             themes,
             sourceBreakdown,
             buildIdeas,
+            bestQuotes,
         };
 
         // Store in Firestore
@@ -199,6 +216,8 @@ export async function POST(request: NextRequest) {
             createdAt: new Date(reportFirestore.createdAt),
             updatedAt: new Date(reportFirestore.updatedAt),
         };
+
+        console.log(`Report generated successfully for: ${query}`);
 
         return NextResponse.json({
             report,

@@ -1,5 +1,15 @@
 import { RawPost } from "@/types/pulse";
 
+// Intent-augmented query suffixes
+const INTENT_QUERIES = [
+    "", // base query
+    "alternative",
+    "recommend",
+    "problem",
+    "looking for",
+    "frustrated",
+];
+
 interface HNHit {
     objectID: string;
     title: string;
@@ -17,11 +27,11 @@ interface HNSearchResponse {
 }
 
 /**
- * Fetch a single page of HN results
+ * Fetch a single HN search
  */
-async function fetchHNPage(query: string, page: number): Promise<RawPost[]> {
+async function fetchHNSearch(query: string): Promise<RawPost[]> {
     const encodedQuery = encodeURIComponent(query);
-    const url = `https://hn.algolia.com/api/v1/search?query=${encodedQuery}&tags=story&hitsPerPage=100&page=${page}`;
+    const url = `https://hn.algolia.com/api/v1/search?query=${encodedQuery}&tags=story&hitsPerPage=50`;
 
     try {
         const response = await fetch(url);
@@ -45,32 +55,94 @@ async function fetchHNPage(query: string, page: number): Promise<RawPost[]> {
             author: hit.author,
         }));
     } catch (error) {
-        console.error("Failed to fetch HN page:", error);
+        console.error("Failed to fetch HN:", error);
         return [];
     }
 }
 
 /**
- * Fetch posts from Hacker News Algolia API with pagination
- * Fetches up to 300 posts
+ * Generate dedupe signature for a post
+ */
+function getDedupeSignature(post: RawPost): string {
+    const normalized = post.title
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 80);
+    return normalized;
+}
+
+/**
+ * Deduplicate posts, keeping the one with highest engagement
+ */
+function deduplicatePosts(posts: RawPost[]): RawPost[] {
+    const signatureMap = new Map<string, RawPost>();
+
+    for (const post of posts) {
+        const sig = getDedupeSignature(post);
+        const existing = signatureMap.get(sig);
+
+        if (!existing) {
+            signatureMap.set(sig, post);
+        } else {
+            const existingScore = existing.score + existing.comments * 2;
+            const newScore = post.score + post.comments * 2;
+            if (newScore > existingScore) {
+                signatureMap.set(sig, post);
+            }
+        }
+    }
+
+    return Array.from(signatureMap.values());
+}
+
+/**
+ * Fetch posts from Hacker News using intent-augmented queries
  */
 export async function fetchHNPosts(query: string): Promise<RawPost[]> {
     const allPosts: RawPost[] = [];
-    const maxPages = 2; // 2 pages × ~75 posts = ~150
+    const seenIds = new Set<string>();
 
-    for (let page = 0; page < maxPages; page++) {
-        if (page > 0) {
+    // Build intent-augmented queries (fewer for HN since it's faster)
+    const queries = INTENT_QUERIES.slice(0, 4).map((suffix) =>
+        suffix ? `${query} ${suffix}` : query
+    );
+
+    for (let i = 0; i < queries.length; i++) {
+        const q = queries[i];
+
+        if (i > 0) {
             await new Promise((resolve) => setTimeout(resolve, 200));
         }
 
-        const posts = await fetchHNPage(query, page);
-        allPosts.push(...posts);
+        const posts = await fetchHNSearch(q);
 
-        if (posts.length < 100) break; // No more pages
+        for (const post of posts) {
+            if (!seenIds.has(post.id)) {
+                seenIds.add(post.id);
+                allPosts.push(post);
+            }
+        }
     }
 
-    console.log(`HN: Fetched ${allPosts.length} posts`);
-    return allPosts;
+    // Filter: HN posts with very low engagement are noise
+    const filtered = allPosts.filter((post) => {
+        // Require at least some engagement
+        if (post.score < 2 && post.comments < 2) return false;
+        // Title must be substantial
+        if (post.title.length < 20) return false;
+        return true;
+    });
+
+    // Deduplicate
+    const deduped = deduplicatePosts(filtered);
+
+    console.log(
+        `HN: Fetched ${allPosts.length} raw → ${filtered.length} filtered → ${deduped.length} unique`
+    );
+
+    return deduped;
 }
 
 /**
