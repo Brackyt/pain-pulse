@@ -153,40 +153,77 @@ function extractKeyPhrases(posts: RawPost[], topN: number = 3): string[] {
 }
 
 /**
+ * Check if a word is junk (usernames, numbers, common noise)
+ */
+function isJunkWord(word: string): boolean {
+    // Numbers only
+    if (/^\d+$/.test(word)) return true;
+    // Starts with u/ or @ (usernames)
+    if (/^(u\/|@)/.test(word)) return true;
+    // Very short
+    if (word.length < 3) return true;
+    // Contains numbers mixed with letters (often IDs/usernames like "user123")
+    if (/\d/.test(word) && /[a-z]/i.test(word)) return true;
+
+    const junkWords = new Set([
+        "update", "help", "question", "today", "yesterday", "anyone",
+        "please", "thanks", "something", "anything", "nothing",
+        "gonna", "wanna", "really", "basically", "actually",
+        "deleted", "removed", "edit", "update", "post", "thread",
+        "week", "month", "year", "day", "time", "thing", "stuff",
+        "professional", "solution", "settings", "version",
+    ]);
+
+    return junkWords.has(word);
+}
+
+/**
  * Generate a theme title from key phrases
  */
 function generateThemeTitle(posts: RawPost[]): string {
-    const phrases = extractKeyPhrases(posts, 1);
+    const phrases = extractKeyPhrases(posts, 3);
 
-    if (phrases.length > 0) {
-        // Capitalize nicely
-        return phrases[0]
-            .split(" ")
-            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-            .join(" ");
+    // Find first phrase that doesn't contain junk
+    for (const phrase of phrases) {
+        const words = phrase.split(" ");
+        const cleanWords = words.filter((w) => !isJunkWord(w));
+        if (cleanWords.length >= 2) {
+            return cleanWords
+                .slice(0, 3)
+                .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                .join(" ");
+        }
     }
 
-    // Fallback: use most common word
+    // Fallback: use most common non-junk word from titles
     const wordCounts = new Map<string, number>();
-    const stopWords = new Set(["the", "a", "an", "and", "or", "for", "to", "is", "are"]);
+    const stopWords = new Set([
+        "the", "a", "an", "and", "or", "for", "to", "is", "are", "was",
+        "were", "be", "been", "being", "have", "has", "had", "do", "does",
+        "did", "will", "would", "could", "should", "may", "might", "must",
+        "can", "this", "that", "these", "those", "with", "from", "about",
+    ]);
 
     for (const post of posts) {
         const words = post.title
             .toLowerCase()
             .replace(/[^a-z0-9\s]/g, "")
             .split(/\s+/)
-            .filter((w) => w.length > 3 && !stopWords.has(w));
+            .filter((w) => w.length > 3 && !stopWords.has(w) && !isJunkWord(w));
 
         for (const word of words) {
             wordCounts.set(word, (wordCounts.get(word) || 0) + 1);
         }
     }
 
-    const topWord = Array.from(wordCounts.entries())
-        .sort((a, b) => b[1] - a[1])[0];
+    // Get top 2 words
+    const topWords = Array.from(wordCounts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 2)
+        .map(([word]) => word.charAt(0).toUpperCase() + word.slice(1));
 
-    if (topWord) {
-        return topWord[0].charAt(0).toUpperCase() + topWord[0].slice(1);
+    if (topWords.length >= 1) {
+        return topWords.join(" ");
     }
 
     return "General Discussion";

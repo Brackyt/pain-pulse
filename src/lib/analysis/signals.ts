@@ -181,8 +181,8 @@ export function analyzePost(post: RawPost): {
 }
 
 /**
- * Extract actual pain phrases and buyer intent questions from posts
- * These are real quotes that show the pain
+ * Extract top phrases using n-gram approach with pain/intent context
+ * This aggregates actual repeating patterns instead of unique regex matches
  */
 export function extractTopPhrases(
     posts: RawPost[],
@@ -190,49 +190,60 @@ export function extractTopPhrases(
 ): { phrase: string; count: number }[] {
     const phraseCounts = new Map<string, number>();
 
+    // Pain/intent trigger words - phrases must start with or contain these
+    const triggerPatterns = [
+        "alternative to", "alternatives to",
+        "looking for", "searching for",
+        "recommend", "recommendation",
+        "anyone using", "anyone use", "anyone tried",
+        "is there a", "are there any",
+        "problem with", "issue with", "issues with",
+        "hate", "frustrated", "frustrating",
+        "too expensive", "overpriced",
+        "doesn't work", "broken", "useless",
+        "why is", "why does", "why can't",
+        "can't figure out", "struggling with",
+        "switched from", "switching to", "migrating from",
+    ];
+
     for (const post of posts) {
-        const fullText = `${post.title} ${post.body}`;
+        const fullText = `${post.title} ${post.body}`.toLowerCase();
 
-        // Extract actual complaints and questions
-        const patterns = [
-            // Buyer intent patterns
-            /(?:any|best|good)\s+alternative(?:s)?\s+to\s+[\w\s]+(?:\?|\.|\!|$)/gi,
-            /looking\s+for\s+(?:a|an)?\s*[\w\s]{3,30}(?:that|which|to)/gi,
-            /is\s+there\s+(?:a|an)\s+[\w\s]{3,40}\?/gi,
-            /what(?:'s| is)\s+(?:a\s+)?(?:good|best|better)\s+[\w\s]{3,30}\?/gi,
-            /recommend(?:ations?)?\s+for\s+[\w\s]{3,30}/gi,
-            /anyone\s+(?:know|using|use|tried)\s+[\w\s]{3,30}\?/gi,
+        // Check for each trigger pattern
+        for (const trigger of triggerPatterns) {
+            if (fullText.includes(trigger)) {
+                // Find the context around the trigger (up to 8 words total)
+                const idx = fullText.indexOf(trigger);
+                const start = Math.max(0, idx);
+                const end = Math.min(fullText.length, idx + 60);
+                let context = fullText.slice(start, end);
 
-            // Pain patterns
-            /(?:i\s+)?hate\s+(?:how|when|that)?\s*[\w\s]{3,40}/gi,
-            /(?:so\s+)?frustrated\s+with\s+[\w\s]{3,30}/gi,
-            /problem\s+with\s+[\w\s]{3,30}/gi,
-            /issue(?:s)?\s+with\s+[\w\s]{3,30}/gi,
-            /(?:why\s+(?:is|does|do)|can(?:'t|not))\s+[\w\s]{3,40}\??/gi,
-            /[\w\s]{3,20}\s+(?:is\s+)?(?:broken|useless|terrible|awful|garbage)/gi,
-            /struggling\s+(?:to|with)\s+[\w\s]{3,30}/gi,
-        ];
+                // Clean up: take words up to punctuation or newline
+                context = context
+                    .replace(/[.!?\n]/g, " ")
+                    .replace(/\s+/g, " ")
+                    .trim()
+                    .split(" ")
+                    .slice(0, 8)
+                    .join(" ");
 
-        for (const pattern of patterns) {
-            const matches = fullText.match(pattern);
-            if (matches) {
-                for (const match of matches) {
-                    // Clean up the match
-                    const cleaned = match
-                        .trim()
-                        .replace(/\s+/g, " ")
-                        .slice(0, 100);
+                if (context.length >= 10 && context.length <= 80) {
+                    // Normalize: just the trigger + first few followup words
+                    const words = context.split(" ");
+                    const triggerWords = trigger.split(" ").length;
+                    const phrase = words.slice(0, triggerWords + 2).join(" ");
 
-                    if (cleaned.length >= 15 && cleaned.length <= 100) {
-                        const normalized = cleaned.toLowerCase();
-                        phraseCounts.set(normalized, (phraseCounts.get(normalized) || 0) + 1);
+                    if (phrase.length >= 8) {
+                        phraseCounts.set(phrase, (phraseCounts.get(phrase) || 0) + 1);
                     }
                 }
             }
         }
     }
 
+    // Filter to phrases with count >= 2, sort by count
     return Array.from(phraseCounts.entries())
+        .filter(([_, count]) => count >= 2)
         .map(([phrase, count]) => ({ phrase, count }))
         .sort((a, b) => b.count - a.count)
         .slice(0, limit);

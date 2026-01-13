@@ -122,9 +122,17 @@ export function calculatePainSpikes(posts: RawPost[]): PainSpike {
     const weeklyPosts = posts.filter((p) => p.createdAt.getTime() > weekAgo);
     const monthlyPosts = posts.filter((p) => p.createdAt.getTime() > monthAgo);
 
-    const weeklyVolume = weeklyPosts.length;
-    const monthlyVolume = monthlyPosts.length;
+    return calculatePainSpikesFromCounts(weeklyPosts.length, monthlyPosts.length);
+}
 
+/**
+ * Calculate pain spikes from pre-computed counts
+ * Use this when weekly and monthly counts come from separate API calls
+ */
+export function calculatePainSpikesFromCounts(
+    weeklyVolume: number,
+    monthlyVolume: number
+): PainSpike {
     // Proper spike calculation:
     // spike = (count_7d + 1) / (count_30d/4 + 1)
     const weeklyCount = weeklyVolume + 1;

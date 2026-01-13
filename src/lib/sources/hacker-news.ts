@@ -27,11 +27,11 @@ interface HNSearchResponse {
 }
 
 /**
- * Fetch a single HN search
+ * Fetch a single HN search with time filter
  */
-async function fetchHNSearch(query: string): Promise<RawPost[]> {
+async function fetchHNSearch(query: string, sinceTimestamp: number): Promise<RawPost[]> {
     const encodedQuery = encodeURIComponent(query);
-    const url = `https://hn.algolia.com/api/v1/search?query=${encodedQuery}&tags=story&hitsPerPage=50`;
+    const url = `https://hn.algolia.com/api/v1/search?query=${encodedQuery}&tags=story&hitsPerPage=50&numericFilters=created_at_i>${sinceTimestamp}`;
 
     try {
         const response = await fetch(url);
@@ -98,14 +98,19 @@ function deduplicatePosts(posts: RawPost[]): RawPost[] {
 }
 
 /**
- * Fetch posts from Hacker News using intent-augmented queries
+ * Fetch posts from Hacker News for a specific time window
  */
-export async function fetchHNPosts(query: string): Promise<RawPost[]> {
+async function fetchHNForWindow(
+    query: string,
+    daysAgo: number
+): Promise<RawPost[]> {
+    const sinceTimestamp = Math.floor((Date.now() - daysAgo * 24 * 60 * 60 * 1000) / 1000);
     const allPosts: RawPost[] = [];
     const seenIds = new Set<string>();
 
-    // Build intent-augmented queries (fewer for HN since it's faster)
-    const queries = INTENT_QUERIES.slice(0, 4).map((suffix) =>
+    // Use fewer intent queries for older data
+    const numQueries = daysAgo <= 7 ? 4 : 2;
+    const queries = INTENT_QUERIES.slice(0, numQueries).map((suffix) =>
         suffix ? `${query} ${suffix}` : query
     );
 
@@ -116,7 +121,7 @@ export async function fetchHNPosts(query: string): Promise<RawPost[]> {
             await new Promise((resolve) => setTimeout(resolve, 200));
         }
 
-        const posts = await fetchHNSearch(q);
+        const posts = await fetchHNSearch(q, sinceTimestamp);
 
         for (const post of posts) {
             if (!seenIds.has(post.id)) {
@@ -126,23 +131,51 @@ export async function fetchHNPosts(query: string): Promise<RawPost[]> {
         }
     }
 
+    return allPosts;
+}
+
+/**
+ * Fetch posts from Hacker News with separate weekly and monthly windows
+ * Returns { weekly: posts from last 7d, monthly: posts from last 30d }
+ */
+export async function fetchHNPosts(query: string): Promise<{
+    weekly: RawPost[];
+    monthly: RawPost[];
+}> {
+    // Fetch both time windows
+    const [weeklyRaw, monthlyRaw] = await Promise.all([
+        fetchHNForWindow(query, 7),
+        fetchHNForWindow(query, 30),
+    ]);
+
     // Filter: HN posts with very low engagement are noise
-    const filtered = allPosts.filter((post) => {
-        // Require at least some engagement
-        if (post.score < 2 && post.comments < 2) return false;
-        // Title must be substantial
-        if (post.title.length < 20) return false;
-        return true;
-    });
+    const filterPosts = (posts: RawPost[]) =>
+        posts.filter((post) => {
+            if (post.score < 2 && post.comments < 2) return false;
+            if (post.title.length < 20) return false;
+            return true;
+        });
+
+    const weeklyFiltered = filterPosts(weeklyRaw);
+    const monthlyFiltered = filterPosts(monthlyRaw);
 
     // Deduplicate
-    const deduped = deduplicatePosts(filtered);
+    const weekly = deduplicatePosts(weeklyFiltered);
+    const monthly = deduplicatePosts(monthlyFiltered);
 
     console.log(
-        `HN: Fetched ${allPosts.length} raw → ${filtered.length} filtered → ${deduped.length} unique`
+        `HN: Weekly ${weeklyRaw.length} → ${weekly.length}, Monthly ${monthlyRaw.length} → ${monthly.length}`
     );
 
-    return deduped;
+    return { weekly, monthly };
+}
+
+/**
+ * Get combined HN posts (for backwards compatibility)
+ */
+export async function fetchHNPostsCombined(query: string): Promise<RawPost[]> {
+    const { monthly } = await fetchHNPosts(query);
+    return monthly;
 }
 
 /**

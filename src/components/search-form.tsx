@@ -6,13 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 const EXAMPLE_KEYWORDS = [
-    "invoice",
-    "AI tools",
-    "spotify",
-    "email",
-    "calendar",
-    "CRM",
-    "analytics",
+    "notion alternative",
+    "email automation",
+    "project management tool",
+    "time tracking",
+    "password manager",
+    "note taking app",
 ];
 
 export function SearchForm() {

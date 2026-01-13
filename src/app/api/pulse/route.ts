@@ -5,11 +5,12 @@ import { checkRateLimit, getClientIP } from "@/lib/rate-limit";
 import { fetchRedditPosts, getSubredditBreakdown } from "@/lib/sources/reddit";
 import { fetchHNPosts, getHNBreakdown } from "@/lib/sources/hacker-news";
 import { fetchBestQuotes } from "@/lib/sources/reddit-comments";
-import { calculateStats, calculatePainSpikes } from "@/lib/analysis/scoring";
+import { calculateStats, calculatePainSpikesFromCounts } from "@/lib/analysis/scoring";
 import { clusterThemes } from "@/lib/analysis/clustering";
 import { generateBuildIdeas } from "@/lib/analysis/ideas";
 import { extractTopPhrases } from "@/lib/analysis/signals";
-import { PulseReport, PulseReportFirestore } from "@/types/pulse";
+import { filterByRelevance } from "@/lib/analysis/relevance";
+import { PulseReport, PulseReportFirestore, RawPost } from "@/types/pulse";
 
 const CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -140,44 +141,70 @@ export async function POST(request: NextRequest) {
 
         console.log(`Generating report for: ${query}`);
 
-        // Fetch data from sources in parallel (with partial failure tolerance)
-        const [redditPosts, hnPosts] = await Promise.all([
+        // Fetch data from sources in parallel
+        const [redditPosts, hnData] = await Promise.all([
             fetchRedditPosts(query).catch((e) => {
                 console.error("Reddit fetch failed:", e);
-                return [];
+                return [] as RawPost[];
             }),
             fetchHNPosts(query).catch((e) => {
                 console.error("HN fetch failed:", e);
-                return [];
+                return { weekly: [] as RawPost[], monthly: [] as RawPost[] };
             }),
         ]);
 
-        const allPosts = [...redditPosts, ...hnPosts];
+        // Combine all posts for analysis (use monthly for full dataset)
+        const allPostsRaw = [...redditPosts, ...hnData.monthly];
 
-        if (allPosts.length === 0) {
+        if (allPostsRaw.length === 0) {
             return NextResponse.json(
                 { error: "No results found for this query. Try a different keyword." },
                 { status: 404 }
             );
         }
 
-        console.log(`Total posts: ${allPosts.length}`);
+        console.log(`Raw posts: ${allPostsRaw.length}`);
 
-        // Compute basic metrics (fast)
+        // CRITICAL: Apply relevance filtering BEFORE any analysis
+        const allPosts = filterByRelevance(allPostsRaw, query, 3);
+
+        if (allPosts.length < 5) {
+            return NextResponse.json(
+                { error: "Not enough relevant results found. Try a more specific query." },
+                { status: 404 }
+            );
+        }
+
+        console.log(`Relevant posts after filtering: ${allPosts.length}`);
+
+        // Filter Reddit posts by relevance too
+        const relevantRedditPosts = filterByRelevance(redditPosts, query, 3);
+
+        // Calculate weekly counts for spike detection
+        const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        const weeklyRedditPosts = relevantRedditPosts.filter(
+            (p) => p.createdAt.getTime() > weekAgo
+        );
+
+        // Weekly = filtered reddit weekly + HN weekly
+        const weeklyCount = weeklyRedditPosts.length + hnData.weekly.length;
+        const monthlyCount = allPosts.length;
+
+        // Compute metrics
         const stats = calculateStats(allPosts);
-        const painSpikes = calculatePainSpikes(allPosts);
+        const painSpikes = calculatePainSpikesFromCounts(weeklyCount, monthlyCount);
         const topPhrases = extractTopPhrases(allPosts);
 
-        // Source breakdown (fast)
+        // Source breakdown (use filtered posts)
         const sourceBreakdown = {
-            reddit: getSubredditBreakdown(redditPosts),
-            hackernews: getHNBreakdown(hnPosts),
+            reddit: getSubredditBreakdown(relevantRedditPosts),
+            hackernews: getHNBreakdown(hnData.monthly),
         };
 
         // Fetch best quotes from Reddit comments (parallel with embeddings)
         // AND run embedding-based clustering
         const [bestQuotes, themes] = await Promise.all([
-            fetchBestQuotes(redditPosts, 10, 10).catch((e) => {
+            fetchBestQuotes(relevantRedditPosts, query, 10, 10).catch((e) => {
                 console.error("Quote extraction failed:", e);
                 return [];
             }),

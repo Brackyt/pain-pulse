@@ -133,10 +133,22 @@ function cleanQuote(text: string): string {
 }
 
 /**
+ * Check if a quote is relevant to the search query
+ */
+function isRelevantToQuery(text: string, query: string): boolean {
+    const lowerText = text.toLowerCase();
+    const queryWords = query.toLowerCase().split(/\s+/).filter((w) => w.length > 2);
+
+    // Quote must contain at least one word from the query
+    return queryWords.some((word) => lowerText.includes(word));
+}
+
+/**
  * Fetch top comments from the best Reddit posts to get real "receipts"
  */
 export async function fetchBestQuotes(
     posts: RawPost[],
+    query: string,
     maxPosts: number = 15,
     maxQuotes: number = 15
 ): Promise<string[]> {
@@ -163,7 +175,7 @@ export async function fetchBestQuotes(
         const comments = await fetchPostComments(post.id, post.title, 15);
 
         for (const comment of comments) {
-            if (isGoodQuote(comment.body)) {
+            if (isGoodQuote(comment.body) && isRelevantToQuery(comment.body, query)) {
                 allQuotes.push({
                     quote: cleanQuote(comment.body),
                     score: comment.score,
