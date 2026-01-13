@@ -83,12 +83,14 @@ export interface RawPost {
     topComments?: string[]; // Top comments for deep pain analysis
 }
 
+import type { Timestamp } from "firebase-admin/firestore";
+
 // Firestore serializable version (with timestamps as numbers)
 export interface PulseReportFirestore {
     query: string;
     slug: string;
-    createdAt: number;
-    updatedAt: number;
+    createdAt: number | Timestamp;
+    updatedAt: number | Timestamp;
     windowDays: number;
     stats: PulseStats;
     painSpikes: PainSpike;

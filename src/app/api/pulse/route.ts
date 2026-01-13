@@ -10,8 +10,20 @@ import { generateBuildIdeas } from "@/lib/analysis/ideas";
 import { extractTopPhrases, extractPainReceipts, extractPainPoints } from "@/lib/analysis/signals";
 import { filterByRelevance } from "@/lib/analysis/relevance";
 import { PulseReport, PulseReportFirestore, RawPost } from "@/types/pulse";
+import { Timestamp } from "firebase-admin/firestore";
 
 const CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+// Helper to safely convert Firestore timestamp or number to Date
+function toDate(val: Timestamp | number | Date): Date {
+    if (val instanceof Date) return val;
+    if (typeof val === 'number') return new Date(val);
+    if (val && typeof (val as Timestamp).toDate === 'function') {
+        return (val as Timestamp).toDate();
+    }
+    // Fallback for unexpected types
+    return new Date();
+}
 
 // Rate limit config: 10 requests per minute per IP
 const RATE_LIMIT_CONFIG = {
@@ -47,8 +59,8 @@ export async function GET(request: NextRequest) {
         // Convert timestamps to dates
         const report: PulseReport = {
             ...data,
-            createdAt: new Date(data.createdAt),
-            updatedAt: new Date(data.updatedAt),
+            createdAt: toDate(data.createdAt),
+            updatedAt: toDate(data.updatedAt),
         };
 
         return NextResponse.json(report);
@@ -120,14 +132,15 @@ export async function POST(request: NextRequest) {
 
         if (existingDoc.exists) {
             const data = existingDoc.data() as PulseReportFirestore;
-            const age = Date.now() - data.updatedAt;
+            const updatedAtMs = toDate(data.updatedAt).getTime();
+            const age = Date.now() - updatedAtMs;
 
             if (age < CACHE_DURATION_MS) {
                 // Return cached report
                 const report: PulseReport = {
                     ...data,
-                    createdAt: new Date(data.createdAt),
-                    updatedAt: new Date(data.updatedAt),
+                    createdAt: toDate(data.createdAt),
+                    updatedAt: toDate(data.updatedAt),
                 };
 
                 return NextResponse.json({
@@ -219,10 +232,10 @@ export async function POST(request: NextRequest) {
         const reportFirestore: PulseReportFirestore = {
             query,
             slug,
-            createdAt: existingDoc.exists
+            createdAt: existingDoc.exists && (existingDoc.data() as PulseReportFirestore).createdAt
                 ? (existingDoc.data() as PulseReportFirestore).createdAt
-                : Date.now(),
-            updatedAt: Date.now(),
+                : Timestamp.now(),
+            updatedAt: Timestamp.now(),
             windowDays: 7,
             stats,
             painSpikes,
@@ -239,8 +252,8 @@ export async function POST(request: NextRequest) {
 
         const report: PulseReport = {
             ...reportFirestore,
-            createdAt: new Date(reportFirestore.createdAt),
-            updatedAt: new Date(reportFirestore.updatedAt),
+            createdAt: toDate(reportFirestore.createdAt),
+            updatedAt: toDate(reportFirestore.updatedAt),
         };
 
         console.log(`Report generated successfully for: ${query}`);

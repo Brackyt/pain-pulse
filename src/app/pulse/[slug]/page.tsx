@@ -28,10 +28,17 @@ async function getReport(slug: string): Promise<PulseReport | null> {
 
         const data = doc.data() as PulseReportFirestore;
 
+        // Validating date function safely
+        const toDate = (val: any) => {
+            if (typeof val === 'number') return new Date(val);
+            if (val && typeof val.toDate === 'function') return val.toDate();
+            return new Date();
+        };
+
         return {
             ...data,
-            createdAt: new Date(data.createdAt),
-            updatedAt: new Date(data.updatedAt),
+            createdAt: toDate(data.createdAt),
+            updatedAt: toDate(data.updatedAt),
         };
     } catch (error) {
         console.error("Failed to fetch report:", error);
