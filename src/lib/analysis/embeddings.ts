@@ -22,24 +22,6 @@ async function getEmbeddingPipeline(): Promise<any> {
 }
 
 /**
- * Generate embedding for a single text
- */
-export async function embedText(text: string): Promise<number[]> {
-    const pipe = await getEmbeddingPipeline();
-
-    // Truncate to ~256 tokens worth of text (~1000 chars)
-    const truncated = text.slice(0, 1000);
-
-    const result = await pipe(truncated, {
-        pooling: "mean",
-        normalize: true,
-    });
-
-    // Convert to array
-    return Array.from(result.data as Float32Array);
-}
-
-/**
  * Generate embeddings for multiple posts
  */
 export async function embedPosts(
