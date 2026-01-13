@@ -20,7 +20,8 @@ const DOMAIN_NOUNS = [
     "solution", "system", "dashboard", "api", "sdk", "library",
     "alternative", "alternatives", "pricing", "cost", "review",
     "problem", "issue", "error", "bug", "guide", "tutorial", "setup",
-    "integration", "stack", "tech", "data", "analytics"
+    "integration", "stack", "tech", "data", "analytics",
+    "fail", "broke", "slow", "stupid", "hate", "nightmare", "sucks"
 ];
 
 /**
@@ -92,13 +93,24 @@ export function extractTopPhrases(posts: RawPost[], limit: number = 20): TopPhra
     return phrases;
 }
 
-// Intent triggers for high-signal quotes
-const QUOTE_TRIGGERS = [
-    "alternative", "recommend", "switch", "replace",
-    "pricing", "cost", "expensive", "cheaper",
-    "love", "hate", "problem", "issue", "bug", "broken",
-    "how do i", "how to", "setup", "configure",
-    "best", "worst", "avoid", "worth it", "scam"
+// Triggers that explicitly signal PAIN, FRUSTRATION, or COST STRUGGLE
+const PAIN_TRIGGERS = [
+    "frustrating", "annoying", "painful", "headache", "nightmare", "fail", "failed",
+    "hate", "sucks", "broken", "unreliable", "buggy", "slow", "hard to", "difficult",
+    "confusing", "overkill", "too complex", "bloated",
+    "too expensive", "insane pricing", "costly", "afford", "cheaper", "ripoff",
+    "workaround", "manual", "spreadsheet", "excel", "hacky", "messy",
+    "abandoned", "gave up", "stopped using", "switched from", "left",
+    "stuck", "blocked", "limit", "limited", "restriction",
+    "scam", "waste of time", "garbage", "trash",
+    "nothing seems to", "don't understand why", "why is it so hard", "nothing fits"
+];
+
+// Triggers for specific CONSTRAINTS (context of struggle)
+const CONSTRAINT_TRIGGERS = [
+    "for agencies", "small team", "at scale", "limitations", "for non-tech",
+    "clunky", "bloat", "learning curve", "too many features", "not enough features",
+    "enterprise", "startup", "freelancer", "budget"
 ];
 
 function cleanQuote(text: string): string {
@@ -107,6 +119,154 @@ function cleanQuote(text: string): string {
         .replace(/^["']|["']$/g, "") // Remove surrounding quotes
         .trim();
 }
+
+/**
+ * Extract "Pain Receipts" (formerly Best Quotes)
+ * 
+ * Rules:
+ * 1. Must contain a PAIN TRIGGER.
+ * 2. Length 10-40 words.
+ * 3. Shows PROOF of struggle (not just a question).
+ */
+export function extractPainReceipts(
+    posts: RawPost[],
+    limit: number = 6
+): string[] {
+    const scoredQuotes: { text: string; score: number }[] = [];
+    const uniqueTexts = new Set<string>();
+
+    // Process top 30 posts (deep scan for pain)
+    const topPosts = posts.slice(0, 30);
+
+    for (const post of topPosts) {
+        // Split into rough sentences
+        const sentences = (post.body || "")
+            .split(/[.!?]+/)
+            .map(s => cleanQuote(s))
+            .filter(s => s.length > 5); // Ignore tiny fragments
+
+        // Also evaluate title
+        sentences.push(cleanQuote(post.title));
+
+        for (const sentence of sentences) {
+            const sLower = sentence.toLowerCase();
+
+            if (uniqueTexts.has(sLower)) continue;
+
+            const words = sentence.split(" ");
+            if (words.length < 8 || words.length > 45) continue;
+
+            let score = 0;
+            let hasPainTrigger = false;
+
+            for (const trigger of PAIN_TRIGGERS) {
+                if (sLower.includes(trigger)) {
+                    score += 10;
+                    hasPainTrigger = true;
+                    // Boost intense pain words
+                    if (["hate", "nightmare", "failed", "expensive"].includes(trigger)) score += 5;
+                }
+            }
+
+            if (!hasPainTrigger) continue;
+
+            // Boost if it sounds like a narrative "we tried..."
+            if (sLower.includes("we tried") || sLower.includes("i tried") || sLower.includes("ended up")) {
+                score += 5;
+            }
+
+            // Boost constraints in longform too
+            if (CONSTRAINT_TRIGGERS.some(t => sLower.includes(t))) {
+                score += 5;
+            }
+
+            scoredQuotes.push({ text: sentence, score });
+            uniqueTexts.add(sLower);
+        }
+    }
+
+    return scoredQuotes
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit)
+        .map(q => q.text);
+}
+
+/**
+ * Extract "Top Frictions" (recurring pain themes)
+ * Returns a list of SHORT pain/constraint statements.
+ * Distinct from receipts: Focus is on "The Problem", not the "Story".
+ * Ranked by Engagement (Post Score) + Match Quality.
+ */
+export function extractPainPoints(posts: RawPost[], limit: number = 5): string[] {
+    const scoredFrictions: { text: string; score: number }[] = [];
+    const uniqueTexts = new Set<string>();
+
+    const topPosts = posts.slice(0, 50); // Scan deep
+
+    for (const post of topPosts) {
+        const sentences = (post.body || "")
+            .split(/[.!?]+/)
+            .map(s => cleanQuote(s))
+            .filter(s => s.length > 5);
+
+        sentences.push(cleanQuote(post.title));
+
+        // Engagement Factor: Logarithmic boost based on post score
+        // score 10 -> +1, score 100 -> +2, score 1000 -> +3
+        const engagementBoost = Math.max(0, Math.log10(post.score || 1) * 2);
+
+        for (const sentence of sentences) {
+            const sLower = sentence.toLowerCase();
+
+            // Dedupe fuzzy matches (contains)
+            if ([...uniqueTexts].some(ut => ut.includes(sLower) || sLower.includes(ut))) continue;
+
+            const words = sentence.split(" ");
+            // Frictions should be punchy: 5-25 words
+            if (words.length < 5 || words.length > 25) continue;
+
+            let score = 0;
+            let hasSignal = false;
+
+            // Constraint Check (Primary Signal for Frictions)
+            if (CONSTRAINT_TRIGGERS.some(t => sLower.includes(t))) {
+                score += 10;
+                hasSignal = true;
+            }
+
+            // Pain Trigger Check (Secondary but required if no constraint)
+            if (PAIN_TRIGGERS.some(t => sLower.includes(t))) {
+                score += hasSignal ? 5 : 8; // Boost existing or base score
+                hasSignal = true;
+            }
+
+            if (!hasSignal) continue;
+
+            // Narrative Boost (we tried, ended up)
+            if (sLower.includes("we tried") || sLower.includes("ended up")) score += 5;
+
+            // Apply Engagement Boost to the final score
+            score += engagementBoost;
+
+            scoredFrictions.push({ text: sentence, score });
+            uniqueTexts.add(sLower);
+        }
+    }
+
+    return scoredFrictions
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit)
+        .map(q => q.text);
+}
+
+// Intent triggers for high-signal quotes
+const QUOTE_TRIGGERS = [
+    "alternative", "recommend", "switch", "replace",
+    "pricing", "cost", "expensive", "cheaper",
+    "love", "hate", "problem", "issue", "bug", "broken",
+    "how do i", "how to", "setup", "configure",
+    "best", "worst", "avoid", "worth it", "scam"
+];
 
 /**
  * Extract "Receipt" Quotes

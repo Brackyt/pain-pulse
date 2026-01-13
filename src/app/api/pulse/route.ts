@@ -7,7 +7,7 @@ import { fetchHNPosts, getHNBreakdown } from "@/lib/sources/hacker-news";
 import { calculateStats, calculatePainSpikesFromCounts } from "@/lib/analysis/scoring";
 import { bucketPosts } from "@/lib/analysis/bucketing";
 import { generateBuildIdeas } from "@/lib/analysis/ideas";
-import { extractTopPhrases, extractBestQuotes } from "@/lib/analysis/signals";
+import { extractTopPhrases, extractPainReceipts, extractPainPoints } from "@/lib/analysis/signals";
 import { filterByRelevance } from "@/lib/analysis/relevance";
 import { PulseReport, PulseReportFirestore, RawPost } from "@/types/pulse";
 
@@ -195,10 +195,9 @@ export async function POST(request: NextRequest) {
         // This now handles phrase extraction per-bucket
         const themes = await bucketPosts(allPosts, query);
 
-        // Top Phrases: Now we aggregate them from the themes for the top-level list
-        // Or simply pick the top ones from the buckets combined
-        const allPhraseObjs = extractTopPhrases(allPosts, 20); // Keep global for the UI 'Top Phrases' list if needed, or remove
-        const topPhrases = allPhraseObjs;
+        // Top Phrases: Aggregate from themes or keep simple global extraction?
+        // Let's keep a global list for the UI sidebar, but make sure it uses the new logic
+        const topPhrases = extractTopPhrases(allPosts, 20);
 
         // Source breakdown (use filtered posts)
         const sourceBreakdown = {
@@ -206,20 +205,24 @@ export async function POST(request: NextRequest) {
             hackernews: getHNBreakdown(hnData.monthly),
         };
 
-        // Quotes: Guaranteed extraction from top relevant posts (Receipts)
-        const bestQuotes = extractBestQuotes(allPosts, 6);
+        // Pain Extraction (The Pivot)
+        // 1. Top Frictions: Short impactful pain statements
+        const frictions = extractPainPoints(allPosts, 5);
+
+        // 2. Pain Receipts: Longer "proof" quotes
+        const painReceipts = extractPainReceipts(allPosts, 6);
 
         // Generate build ideas based on themes
         const buildIdeas = generateBuildIdeas(themes, query);
 
-        const now = Date.now();
+        // 3. CACHE: Store report
         const reportFirestore: PulseReportFirestore = {
             query,
             slug,
             createdAt: existingDoc.exists
                 ? (existingDoc.data() as PulseReportFirestore).createdAt
-                : now,
-            updatedAt: now,
+                : Date.now(),
+            updatedAt: Date.now(),
             windowDays: 7,
             stats,
             painSpikes,
@@ -227,7 +230,8 @@ export async function POST(request: NextRequest) {
             themes,
             sourceBreakdown,
             buildIdeas,
-            bestQuotes,
+            frictions,
+            painReceipts
         };
 
         // Store in Firestore

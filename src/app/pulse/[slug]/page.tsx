@@ -5,6 +5,7 @@ import { db } from "@/lib/firebase-admin";
 import { PulseReport, PulseReportFirestore } from "@/types/pulse";
 import { MetricCard } from "@/components/pulse/metric-card";
 import { PainSpikes } from "@/components/pulse/pain-spikes";
+import { FrictionsList } from "@/components/pulse/frictions-list";
 import { ThemesList } from "@/components/pulse/themes-list";
 import { QuotesSection } from "@/components/pulse/quotes-section";
 import { BestQuotes } from "@/components/pulse/best-quotes";
@@ -151,6 +152,11 @@ export default async function PulsePage({ params }: PageProps) {
                     />
                 </section>
 
+                {/* Top Frictions (NEW SECTION) */}
+                <section className="mb-12">
+                    <FrictionsList frictions={report.frictions || []} />
+                </section>
+
                 {/* Pain Spikes */}
                 <section className="mb-12">
                     <PainSpikes spikes={report.painSpikes} />
@@ -165,10 +171,11 @@ export default async function PulsePage({ params }: PageProps) {
                     <QuotesSection phrases={report.topPhrases} />
                 </div>
 
-                {/* Best Quotes from Comments */}
-                {report.bestQuotes && report.bestQuotes.length > 0 && (
+                {/* Pain Receipts (Formerly Best Quotes) */}
+                {/* We use the same component but pass the new 'painReceipts' data */}
+                {report.painReceipts && report.painReceipts.length > 0 && (
                     <section className="mb-12">
-                        <BestQuotes quotes={report.bestQuotes} />
+                        <BestQuotes quotes={report.painReceipts} />
                     </section>
                 )}
 

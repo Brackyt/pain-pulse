@@ -63,7 +63,8 @@ export interface PulseReport {
     themes: Theme[];
     sourceBreakdown: SourceBreakdown;
     buildIdeas: BuildIdea[];
-    bestQuotes: string[]; // High-quality quotes from comments
+    frictions: string[]; // Extracted top pain points/struggles
+    painReceipts: string[]; // High-quality quotes proving pain (formerly bestQuotes)
 }
 
 // Raw post data from sources
@@ -94,5 +95,6 @@ export interface PulseReportFirestore {
     themes: Theme[];
     sourceBreakdown: SourceBreakdown;
     buildIdeas: BuildIdea[];
-    bestQuotes: string[];
+    frictions: string[];
+    painReceipts: string[];
 }

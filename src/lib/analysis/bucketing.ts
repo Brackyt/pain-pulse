@@ -1,11 +1,11 @@
 import { RawPost, Theme } from "@/types/pulse";
-import { extractBestQuotes, extractTopPhrases } from "@/lib/analysis/signals";
+import { extractPainReceipts, extractTopPhrases } from "@/lib/analysis/signals";
 
 // Static Intent Buckets
 const BUCKETS = [
     {
         id: "alternatives",
-        title: "Alternatives & Competitors",
+        title: "Market Landscape", // RENAMED from "Alternatives & Competitors"
         keywords: [
             "alternative", "competitor", "vs", "versus", "switch from",
             "replace", "similar like", "better than"
@@ -13,10 +13,10 @@ const BUCKETS = [
     },
     {
         id: "pricing",
-        title: "Pricing & Cost",
+        title: "Pricing Frustrations", // RENAMED
         keywords: [
             "pricing", "cost", "price", "expensive", "cheap", "free",
-            "subscription", "lifetime", "payment", "billing"
+            "subscription", "lifetime", "payment", "billing", "afford"
         ]
     },
     {
@@ -77,8 +77,9 @@ export async function bucketPosts(posts: RawPost[], query: string): Promise<Them
 
         const share = Math.round((bucketPosts.length / totalPosts) * 100);
 
-        // Extract "Receipt" Quotes specifically for this bucket
-        const quotes = extractBestQuotes(bucketPosts, 5);
+        // Extract "Pain Receipts" specifically for this bucket
+        // Renamed function call
+        const quotes = extractPainReceipts(bucketPosts, 5);
 
         // Extract Top Phrases specifically for this bucket
         // Map TopPhrase[] -> string[] for Theme interface compatibility
