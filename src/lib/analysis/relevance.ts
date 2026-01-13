@@ -18,25 +18,36 @@ const JUNK_BLACKLIST = [
     "megathread", "daily thread", "weekly thread", "monthly thread",
     "automod", "automoderator", "remind me", "upvote", "karma",
     "discord server", "telegram group", "dm me", "inbox me",
+    "hiring", "job offer", "salary", "interview", "resume", "cv review" // Added career noise
 ];
 
 /**
- * Gate 3 triggers: Intent Proximity
- * Post must have one of these near the keyword.
+ * TOOLS MODE: Anchors
+ * Post must contain at least one of these to be considered "about a tool".
  */
-const INTENT_TRIGGERS = [
-    "alternative", "alternatives",
-    "recommend", "recommendation", "recommendations",
-    "tool", "tools", "app", "apps", "software",
-    "pricing", "cost", "price", "expensive", "cheap", "free",
-    "switch", "switching", "replace", "replacement",
-    "how do you", "how to", "setup", "configure",
-    "anyone using", "anyone use", "anyone have",
-    "suggestions", "suggest",
-    "vs", "versus", "compare", "comparison",
-    "best", "top", "good",
-    "looking for", "search for", "searching for",
-    "problem", "issue", "doesn't work", "broken", "hate", "sucks"
+const TOOL_ANCHORS = [
+    "tool", "tools", "app", "apps", "software", "platform", "service",
+    "solution", "dashboard", "api", "sdk", "library", "plugin", "extension",
+    "self-hosted", "open source", "open-source", "saas", "startup",
+    "alternative", "pricing", "cost", "vs", "comparison", "review",
+    "integration", "stack", "tech stack"
+];
+
+/**
+ * TOOLS MODE: High Intent Patterns
+ * Generic signals that user is looking for or evaluating a solution.
+ */
+const HIGH_INTENT_PATTERNS = [
+    /alternative\s+to/i,
+    /looking\s+for/i,
+    /recommend/i,
+    /best\s+.*(tool|app|software|platform)/i,
+    /too\s+expensive/i,
+    /switch\s+from/i,
+    /replace/i,
+    /how\s+do\s+I/i,
+    /anyone\s+using/i,
+    /worth\s+it/i
 ];
 
 /**
@@ -52,9 +63,8 @@ function checkDominance(text: string, title: string, query: string): boolean {
     }
 
     // 2. Density Check
-    // Simple word count approximation
     const words = text.split(/\s+/);
-    if (words.length < 10) return false; // Too short to be useful if not in title
+    if (words.length < 10) return false;
 
     const queryWords = queryLower.split(/\s+/).filter(w => w.length > 2);
     if (queryWords.length === 0) return false;
@@ -72,9 +82,13 @@ function checkDominance(text: string, title: string, query: string): boolean {
 }
 
 /**
- * Calculate relevance score using 3-Gate System
- * 
- * Returns score > 0 only if it passes all gates.
+ * Calculate relevance score using TOOLS MODE Logic
+ *
+ * Pipeline:
+ * 1. Spam Check (Fail)
+ * 2. Tool Anchor Check (Fail if no tool/intent signal)
+ * 3. Keyword Dominance (Fail if incidental)
+ * 4. Proximity Boost (Score)
  */
 export function calculateRelevanceScore(
     post: RawPost,
@@ -84,54 +98,37 @@ export function calculateRelevanceScore(
 
     // Gate 1: Spam Blacklist
     if (JUNK_BLACKLIST.some(word => text.includes(word))) {
-        return 0; // Immediate disqualification
+        return 0;
     }
 
-    // Gate 2: Keyword Dominance
+    // Gate 2: Tools Mode Anchor
+    // Must match a Tool Anchor OR a High Intent Pattern
+    const hasToolAnchor = TOOL_ANCHORS.some(a => text.includes(a));
+    const hasIntentPattern = HIGH_INTENT_PATTERNS.some(p => p.test(text));
+
+    if (!hasToolAnchor && !hasIntentPattern) {
+        return 0; // Not about a tool/solution
+    }
+
+    // Gate 3: Keyword Dominance
     if (!checkDominance(text, post.title, query)) {
-        return 0; // Not "about" the topic enough
+        return 0; // Not about the query topic
     }
 
-    let score = 5; // Base score for passing dominance
+    let score = 10; // Base score for passing generic tool gate
 
-    // Gate 3: Intent Proximity
-    // We boost highly if intent is found. 
-    // If strict mode is needed, we could return 0 if no intent found,
-    // but typically "Dominance + No Blacklist" is decent enough to keep 
-    // for broader volume, while Proximity gives high score.
-
-    const words = text.replace(/[^a-z0-9\s]/g, " ").split(/\s+/);
-    const triggerSet = new Set(INTENT_TRIGGERS);
-    const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
-
-    // Find query indices
-    const queryIndices: number[] = [];
-    words.forEach((word, idx) => {
-        if (queryWords.some(qw => word.includes(qw))) {
-            queryIndices.push(idx);
-        }
-    });
-
-    let hasProximity = false;
-    const PROXIMITY_WINDOW = 15; // words
-
-    for (const idx of queryIndices) {
-        const start = Math.max(0, idx - PROXIMITY_WINDOW);
-        const end = Math.min(words.length, idx + PROXIMITY_WINDOW);
-
-        for (let i = start; i < end; i++) {
-            if (triggerSet.has(words[i])) {
-                score += 10;
-                hasProximity = true;
-                break;
-            }
-        }
-        if (hasProximity) break;
+    // Bonus: Proximity of Intent
+    // If exact query is near an intent trigger, boost score
+    const queryLower = query.toLowerCase();
+    if (post.title.toLowerCase().includes(queryLower)) {
+        score += 5;
     }
 
-    // Optional: If we want to be STRICT about intent (Gate 3 as requirement)
-    // Uncomment next line:
-    if (!hasProximity) return 0;
+    // Simple proximity boost if "alternative" or "recommend" is near query
+    // This is less strict now because Gate 2 ensures we are in "Tools Land"
+    if (text.match(new RegExp(`(alternative|recommend|best).{0,50}${queryLower}`, 'i'))) {
+        score += 10;
+    }
 
     return score;
 }

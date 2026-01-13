@@ -13,6 +13,7 @@ export interface Theme {
     title: string;
     share: number; // Percentage 0-100
     quotes: string[];
+    keywords?: string[]; // Per-bucket phrases
     sources: SourceLink[];
 }
 

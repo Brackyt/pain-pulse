@@ -1,148 +1,179 @@
-import { RawPost } from "@/types/pulse";
+import { RawPost, TopPhrase } from "@/types/pulse";
 
-/**
- * Universal intent triggers used for quote linking
- */
-const INTENT_TRIGGERS = [
-    "alternative", "recommend", "tool", "app", "switch", "replace",
-    "pricing", "cost", "expensive", "cheap", "free",
-    "how do", "how to", "setup", "help", "suggestion",
-    "best", "worst", "hate", "love", "problem", "issue", "doesn't work"
-];
-
+// Stop words to filter out common noise
 const STOP_WORDS = new Set([
-    "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
-    "of", "with", "by", "from", "as", "is", "was", "are", "were", "been",
-    "be", "have", "has", "had", "do", "does", "did", "will", "would", "could",
-    "should", "may", "might", "must", "can", "this", "that", "these", "those",
-    "i", "you", "he", "she", "it", "we", "they", "my", "your", "his", "her",
-    "its", "our", "their", "what", "which", "who", "when", "where", "why",
-    "how", "all", "each", "every", "both", "few", "more", "most", "other",
-    "some", "such", "no", "not", "only", "own", "same", "so", "than", "too",
-    "very", "just", "also", "now", "here", "there", "then", "if", "any",
-    "about", "into", "through", "during", "before", "after", "up", "down",
-    "out", "off", "over", "under", "again", "further", "once", "like", "using",
-    "use", "used", "get", "got", "getting", "one", "two", "new", "first",
-    "really", "need", "want", "think", "know", "see", "end", "top", "try",
-    "http", "https", "www", "com", "org", "net", "io", "reddit", "comments",
-    "deleted", "removed", "amp", "nbsp", "quot", "etc", "something", "anything",
-    "question", "help", "update", "please", "thanks", "guys", "anyone"
+    "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with",
+    "by", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had",
+    "do", "does", "did", "can", "could", "will", "would", "should", "may", "might",
+    "must", "i", "you", "he", "she", "it", "we", "they", "my", "your", "his", "her",
+    "its", "our", "their", "this", "that", "these", "those", "from", "up", "down",
+    "out", "about", "into", "over", "after", "some", "any", "no", "not", "only",
+    "own", "other", "so", "than", "too", "very", "just", "if", "when", "where", "why",
+    "how", "all", "what", "more", "most", "who", "which", "there", "here", "as",
+    "video", "image", "media", "http", "https", "www", "com", "reddit", "comments",
+    "removed", "deleted", "amp", "xb", "gt", "lt"
 ]);
 
-/**
- * Clean text for n-gram extraction
- */
-function cleanText(text: string): string[] {
-    return text.toLowerCase()
-        .replace(/https?:\/\/\S+/g, "") // remove URLs
-        .replace(/[^a-z0-9\s]/g, " ")   // remove punctuation
-        .split(/\s+/)
-        .filter(w => w.length > 2 && !STOP_WORDS.has(w));
-}
+// Words that significantly anchor a phrase to the domain (must contain at least one)
+const DOMAIN_NOUNS = [
+    "tool", "tools", "app", "apps", "software", "platform", "service",
+    "solution", "system", "dashboard", "api", "sdk", "library",
+    "alternative", "alternatives", "pricing", "cost", "review",
+    "problem", "issue", "error", "bug", "guide", "tutorial", "setup",
+    "integration", "stack", "tech", "data", "analytics"
+];
 
 /**
- * Extract top phrases using N-Grams (3-6 words)
- * Scored by frequency * engagement
+ * Extract generic top phrases (2-6 word n-grams) from a set of posts.
+ * Scored by frequency * engagement.
+ * 
+ * Rules:
+ * 1. Must contain a DOMAIN NOUN (e.g. "tool", "app", "pricing").
+ * 2. Deduplicates singular/plural forms ("analytics tool" == "analytics tools").
  */
-export function extractTopPhrases(
-    posts: RawPost[],
-    limit: number = 20 // Return more, let UI truncate
-): { phrase: string; count: number }[] {
-    const phraseScores = new Map<string, number>();
-    const phraseCounts = new Map<string, number>();
+export function extractTopPhrases(posts: RawPost[], limit: number = 20): TopPhrase[] {
+    const phraseMap = new Map<string, { count: number; original: string }>();
+    const allText = posts.map(p => `${p.title} ${p.body}`).join(" ").toLowerCase();
 
-    for (const post of posts) {
-        const text = `${post.title} ${post.body}`;
-        const words = cleanText(text);
-        const engagement = Math.log(1 + post.score + post.comments);
+    // Clean text: remove special chars, keep alphanumeric and spaces
+    const cleanText = allText.replace(/[^a-z0-9\s]/g, " ");
+    const words = cleanText.split(/\s+/).filter(w => w.length > 2 && !STOP_WORDS.has(w));
 
-        // Extract 3, 4, 5, 6-grams
-        for (let n = 3; n <= 6; n++) {
-            for (let i = 0; i < words.length - n + 1; i++) {
-                const phrase = words.slice(i, i + n).join(" ");
+    // Generate n-grams (2 to 5 words - reduced max length slightly)
+    const MAX_N = 5;
+    const MIN_N = 2; // Allow 2 words if they are strong
 
-                // Score = 1 (base) + engagement boost
-                const score = 1 + (engagement * 0.5);
+    for (let i = 0; i < words.length; i++) {
+        for (let n = MIN_N; n <= MAX_N; n++) {
+            if (i + n > words.length) break;
 
-                phraseScores.set(phrase, (phraseScores.get(phrase) || 0) + score);
-                phraseCounts.set(phrase, (phraseCounts.get(phrase) || 0) + 1);
+            const phraseTokens = words.slice(i, i + n);
+            const phrase = phraseTokens.join(" ");
+
+            // Validation 1: alphanumeric check
+            if (/^\d|\d$/.test(phrase)) continue;
+
+            // Validation 2: Domain Noun Gate
+            // Must contain at least one domain-anchoring noun
+            // This kills "formatting png auto"
+            if (!phraseTokens.some(t => DOMAIN_NOUNS.some(noun => t.includes(noun)))) {
+                continue;
             }
+
+            // Deduplication Key: Normalize plurals
+            // "analytics tools" -> "analytics tool"
+            // Simple heuristic: remove trailing 's' from words > 3 chars
+            const dedupKey = phraseTokens.map(t =>
+                (t.length > 3 && t.endsWith('s')) ? t.slice(0, -1) : t
+            ).join(" ");
+
+            const existing = phraseMap.get(dedupKey) || { count: 0, original: phrase };
+            existing.count++;
+
+            // Update original to the most frequent variation (simple swap if we see this one)
+            // Or just keep the first one. Let's keep the one that matches dedup key if possible?
+            // Actually, usually plural is fine. We just want to count them together.
+            if (phrase.length < existing.original.length) existing.original = phrase; // Prefer shorter/singular specific for display? 
+
+            phraseMap.set(dedupKey, existing);
         }
     }
 
-    // Filter and sort
-    return Array.from(phraseScores.entries())
-        .filter(([phrase, score]) => {
-            const count = phraseCounts.get(phrase) || 0;
-            // Require at least 2 occurrences unless score is very high
-            return count >= 2;
-        })
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, limit)
-        .map(([phrase]) => ({
-            phrase,
-            count: phraseCounts.get(phrase) || 0
-        }));
+    // Convert to array and filter
+    const phrases = Array.from(phraseMap.values())
+        .map(data => ({
+            phrase: data.original,
+            count: data.count
+        }))
+        .filter(p => p.count > 1) // Must appear at least twice
+        .sort((a, b) => b.count - a.count)
+        .slice(0, limit);
+
+    return phrases;
+}
+
+// Intent triggers for high-signal quotes
+const QUOTE_TRIGGERS = [
+    "alternative", "recommend", "switch", "replace",
+    "pricing", "cost", "expensive", "cheaper",
+    "love", "hate", "problem", "issue", "bug", "broken",
+    "how do i", "how to", "setup", "configure",
+    "best", "worst", "avoid", "worth it", "scam"
+];
+
+function cleanQuote(text: string): string {
+    return text
+        .replace(/\s+/g, " ")
+        .replace(/^["']|["']$/g, "") // Remove surrounding quotes
+        .trim();
 }
 
 /**
- * Guaranteed Best Quotes Extraction
- * Picks best sentences from top posts, handling fallbacks robustly.
+ * Extract "Receipt" Quotes
+ * 
+ * Rules:
+ * 1. Must come from the provided posts.
+ * 2. Must contain an INTENT TRIGGER.
+ * 3. Length must be 10-35 words (tweet sized, not a novel).
+ * 4. Fallback: Use post title if no perfect sentence found.
  */
 export function extractBestQuotes(
     posts: RawPost[],
-    query: string,
-    limit: number = 5
+    limit: number = 6
 ): string[] {
-    const quotes: string[] = [];
-    const usedTexts = new Set<string>();
+    const scoredQuotes: { text: string; score: number }[] = [];
+    const uniqueTexts = new Set<string>();
 
-    // Take top 20 posts by score
-    const topPosts = [...posts]
-        .sort((a, b) => (b.score + b.comments) - (a.score + a.comments))
-        .slice(0, 20);
-
-    const queryLower = query.toLowerCase();
+    // Process top 20 posts only (highest signal)
+    const topPosts = posts.slice(0, 20);
 
     for (const post of topPosts) {
-        if (quotes.length >= limit) break;
+        // Split into rough sentences
+        const sentences = (post.body || "")
+            .split(/[.!?]+/)
+            .map(s => cleanQuote(s))
+            .filter(s => s.length > 5); // Ignore tiny fragments
 
-        const text = post.body || post.title;
-        // Split into sentences (simple split by punctuation)
-        const sentences = text.split(/[.!?\n]+/);
+        // Also evaluate title
+        sentences.push(cleanQuote(post.title));
 
-        // Find best sentence
-        let bestSentence = "";
-        let bestScore = -1;
+        for (const sentence of sentences) {
+            if (uniqueTexts.has(sentence)) continue;
 
-        for (const s of sentences) {
-            const sLower = s.toLowerCase().trim();
-            if (sLower.length < 20 || sLower.length > 200) continue;
+            const words = sentence.split(" ");
+
+            // Length Gate (8-40 words)
+            // Titles might be shorter, that's okay if they are high intent
+            if (words.length < 8 || words.length > 40) continue;
 
             let score = 0;
 
-            // Contains query?
-            if (sLower.includes(queryLower)) score += 5;
-
-            // Contains intent trigger?
-            if (INTENT_TRIGGERS.some(t => sLower.includes(t))) score += 3;
-
-            if (score > bestScore) {
-                bestScore = score;
-                bestSentence = s.trim();
+            // Trigger Check
+            let hasTrigger = false;
+            for (const trigger of QUOTE_TRIGGERS) {
+                if (sentence.toLowerCase().includes(trigger)) {
+                    score += 10;
+                    hasTrigger = true;
+                    // Boost specific strong triggers
+                    if (["alternative", "pricing", "problem"].includes(trigger)) score += 5;
+                }
             }
-        }
 
-        // If found a good sentence, use it
-        if (bestScore > 0 && !usedTexts.has(bestSentence)) {
-            quotes.push(bestSentence);
-            usedTexts.add(bestSentence);
-        } else if (post.title.length > 20 && !usedTexts.has(post.title)) {
-            // Fallback to title if no good sentence found
-            quotes.push(post.title);
-            usedTexts.add(post.title);
+            if (!hasTrigger) continue; // Strict Requirement
+
+            // Boost if it comes from title
+            if (sentence === cleanQuote(post.title)) {
+                score += 5;
+            }
+
+            scoredQuotes.push({ text: sentence, score });
+            uniqueTexts.add(sentence);
         }
     }
 
-    return quotes;
+    // Sort by score and take top N
+    return scoredQuotes
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit)
+        .map(q => q.text);
 }

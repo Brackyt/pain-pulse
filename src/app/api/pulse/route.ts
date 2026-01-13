@@ -177,34 +177,37 @@ export async function POST(request: NextRequest) {
         console.log(`Relevant posts after filtering: ${allPosts.length}`);
 
         // Filter Reddit posts by relevance too
-        const relevantRedditPosts = filterByRelevance(redditPosts, query, 3);
+        // Calculate volume for "Pain Spike"
+        // Monthly = All relevant posts (since we fetch ~30d by default on reddit, and monthly top on HN)
+        const monthlyVolume = allPosts.length;
 
-        // Calculate weekly counts for spike detection
+        // Weekly = Filter relevant posts by creation date > 7d ago
         const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-        const weeklyRedditPosts = relevantRedditPosts.filter(
+        const weeklyVolume = allPosts.filter(
             (p) => p.createdAt.getTime() > weekAgo
-        );
-
-        // Weekly = filtered reddit weekly + HN weekly
-        const weeklyCount = weeklyRedditPosts.length + hnData.weekly.length;
-        const monthlyCount = allPosts.length;
+        ).length;
 
         // Compute metrics
         const stats = calculateStats(allPosts);
-        const painSpikes = calculatePainSpikesFromCounts(weeklyCount, monthlyCount);
-        const topPhrases = extractTopPhrases(allPosts);
+        const painSpikes = calculatePainSpikesFromCounts(weeklyVolume, monthlyVolume);
+
+        // Buckets: Static Intent Buckets (Alternatives, Pricing, etc.)
+        // This now handles phrase extraction per-bucket
+        const themes = await bucketPosts(allPosts, query);
+
+        // Top Phrases: Now we aggregate them from the themes for the top-level list
+        // Or simply pick the top ones from the buckets combined
+        const allPhraseObjs = extractTopPhrases(allPosts, 20); // Keep global for the UI 'Top Phrases' list if needed, or remove
+        const topPhrases = allPhraseObjs;
 
         // Source breakdown (use filtered posts)
         const sourceBreakdown = {
-            reddit: getSubredditBreakdown(relevantRedditPosts),
+            reddit: getSubredditBreakdown(allPosts.filter(p => p.source === 'reddit')),
             hackernews: getHNBreakdown(hnData.monthly),
         };
 
-        // Buckets: Static Intent Buckets (Alternatives, Pricing, etc.)
-        const themes = await bucketPosts(allPosts, query);
-
-        // Quotes: Guaranteed extraction from top relevant posts
-        const bestQuotes = extractBestQuotes(allPosts, query, 6);
+        // Quotes: Guaranteed extraction from top relevant posts (Receipts)
+        const bestQuotes = extractBestQuotes(allPosts, 6);
 
         // Generate build ideas based on themes
         const buildIdeas = generateBuildIdeas(themes, query);
