@@ -1,175 +1,138 @@
 import { RawPost } from "@/types/pulse";
 
 /**
- * Category-specific expansion dictionaries for relevance scoring
- * Each category has: expansions (boost relevance) and exclusions (kill relevance)
+ * Gate 1: Global Spam Blacklist
+ * Hard-drop posts containing these terms.
  */
-const CATEGORY_EXPANSIONS: Record<string, { expansions: string[]; exclusions: string[] }> = {
-    // Default expansions based on common pain/intent patterns
-    default: {
-        expansions: [],
-        exclusions: [
-            // Spam patterns
-            "raffle", "escrow", "spot", "giveaway", "PSA", "megathread",
-            "daily thread", "weekly thread", "monthly thread",
-            // Bot/automation spam
-            "automod", "automoderator", "bot", "remind me",
-            // Unrelated noise
-            "meme", "shitpost", "circlejerk", "karma farm",
-        ],
-    },
-    
-    // Note-taking / productivity
-    "note": {
-        expansions: [
-            "note taking", "note-taking", "notetaking", "notes app",
-            "onenote", "goodnotes", "obsidian", "notion", "evernote",
-            "apple notes", "markdown notes", "second brain", "zettelkasten",
-            "roam research", "logseq", "bear app", "joplin", "simplenote",
-            "org-mode", "pkm", "personal knowledge",
-        ],
-        exclusions: ["raffle", "escrow", "spot", "giveaway", "PSA"],
-    },
-    
-    // Project management
-    "project": {
-        expansions: [
-            "project management", "task management", "kanban", "gantt",
-            "jira", "asana", "monday.com", "clickup", "trello", "basecamp",
-            "linear", "height", "shortcut", "teamwork", "wrike",
-            "scrum", "agile", "sprint planning", "backlog",
-        ],
-        exclusions: ["raffle", "escrow", "spot", "giveaway"],
-    },
-    
-    // Email / automation
-    "email": {
-        expansions: [
-            "email automation", "email marketing", "newsletter",
-            "mailchimp", "convertkit", "beehiiv", "substack", "buttondown",
-            "smtp", "transactional email", "cold email", "email outreach",
-            "sendgrid", "postmark", "mailgun", "resend",
-        ],
-        exclusions: ["raffle", "escrow", "giveaway"],
-    },
-    
-    // Analytics / tracking
-    "analytics": {
-        expansions: [
-            "web analytics", "product analytics", "google analytics", "ga4",
-            "plausible", "fathom", "umami", "mixpanel", "amplitude", "posthog",
-            "heap", "segment", "tracking", "events", "funnels", "attribution",
-            "user behavior", "session recording", "heatmap",
-        ],
-        exclusions: ["mba", "iim", "admission", "course", "degree", "raffle"],
-    },
-    
-    // Password / security
-    "password": {
-        expansions: [
-            "password manager", "1password", "bitwarden", "lastpass",
-            "dashlane", "keepass", "nordpass", "proton pass",
-            "passkey", "2fa", "mfa", "authenticator",
-        ],
-        exclusions: ["raffle", "escrow", "giveaway"],
-    },
-    
-    // Time tracking
-    "time": {
-        expansions: [
-            "time tracking", "time tracker", "toggl", "clockify", "harvest",
-            "timesheet", "pomodoro", "rescuetime", "timely",
-            "billable hours", "freelancer time",
-        ],
-        exclusions: ["raffle", "escrow", "giveaway"],
-    },
-};
+const JUNK_BLACKLIST = [
+    // Exam cheating / Academic dishonesty
+    "pay someone", "take my", "write my", "exam help", "assignment help",
+    "online class", "do my homework", "hesi", "proctored", "respondus",
+    "lockdown browser", "cheat", "cheating",
+
+    // Marketplace / Scams
+    "escrow", "raffle", "spot", "shipping", "paypal g&s", "giveaway",
+    "for sale", "selling", "wtb", "wts", "vendor",
+
+    // Community noise
+    "megathread", "daily thread", "weekly thread", "monthly thread",
+    "automod", "automoderator", "remind me", "upvote", "karma",
+    "discord server", "telegram group", "dm me", "inbox me",
+];
 
 /**
- * Find the best matching category for a query
+ * Gate 3 triggers: Intent Proximity
+ * Post must have one of these near the keyword.
  */
-function findCategory(query: string): { expansions: string[]; exclusions: string[] } {
-    const lowerQuery = query.toLowerCase();
-    
-    for (const [key, value] of Object.entries(CATEGORY_EXPANSIONS)) {
-        if (key !== "default" && lowerQuery.includes(key)) {
-            return {
-                expansions: [...value.expansions, ...CATEGORY_EXPANSIONS.default.expansions],
-                exclusions: [...value.exclusions, ...CATEGORY_EXPANSIONS.default.exclusions],
-            };
+const INTENT_TRIGGERS = [
+    "alternative", "alternatives",
+    "recommend", "recommendation", "recommendations",
+    "tool", "tools", "app", "apps", "software",
+    "pricing", "cost", "price", "expensive", "cheap", "free",
+    "switch", "switching", "replace", "replacement",
+    "how do you", "how to", "setup", "configure",
+    "anyone using", "anyone use", "anyone have",
+    "suggestions", "suggest",
+    "vs", "versus", "compare", "comparison",
+    "best", "top", "good",
+    "looking for", "search for", "searching for",
+    "problem", "issue", "doesn't work", "broken", "hate", "sucks"
+];
+
+/**
+ * Check Keyword Dominance (Gate 2)
+ * Returns true if query enters Title OR constitutes > 1.5% of body text
+ */
+function checkDominance(text: string, title: string, query: string): boolean {
+    const queryLower = query.toLowerCase();
+
+    // 1. Title Hit (High confidence)
+    if (title.toLowerCase().includes(queryLower)) {
+        return true;
+    }
+
+    // 2. Density Check
+    // Simple word count approximation
+    const words = text.split(/\s+/);
+    if (words.length < 10) return false; // Too short to be useful if not in title
+
+    const queryWords = queryLower.split(/\s+/).filter(w => w.length > 2);
+    if (queryWords.length === 0) return false;
+
+    // Count occurrences of any significant query word
+    let hits = 0;
+    for (const word of words) {
+        if (queryWords.some(qw => word.includes(qw))) {
+            hits++;
         }
     }
-    
-    // Also check if query itself matches any expansion terms
-    for (const [key, value] of Object.entries(CATEGORY_EXPANSIONS)) {
-        if (key === "default") continue;
-        for (const exp of value.expansions) {
-            if (lowerQuery.includes(exp) || exp.includes(lowerQuery)) {
-                return {
-                    expansions: [...value.expansions],
-                    exclusions: [...value.exclusions, ...CATEGORY_EXPANSIONS.default.exclusions],
-                };
-            }
-        }
-    }
-    
-    return CATEGORY_EXPANSIONS.default;
+
+    const density = hits / words.length;
+    return density >= 0.015; // 1.5% density threshold
 }
 
 /**
- * Calculate relevance score for a post
- * Returns 0 if post should be dropped, positive score if relevant
+ * Calculate relevance score using 3-Gate System
+ * 
+ * Returns score > 0 only if it passes all gates.
  */
 export function calculateRelevanceScore(
     post: RawPost,
-    query: string,
-    expansions: string[],
-    exclusions: string[]
+    query: string
 ): number {
     const text = `${post.title} ${post.body}`.toLowerCase();
-    const queryLower = query.toLowerCase();
-    const queryWords = queryLower.split(/\s+/).filter((w) => w.length > 2);
-    
-    // Check exclusions first - if any match, return 0
-    for (const exc of exclusions) {
-        if (text.includes(exc.toLowerCase())) {
-            return 0;
+
+    // Gate 1: Spam Blacklist
+    if (JUNK_BLACKLIST.some(word => text.includes(word))) {
+        return 0; // Immediate disqualification
+    }
+
+    // Gate 2: Keyword Dominance
+    if (!checkDominance(text, post.title, query)) {
+        return 0; // Not "about" the topic enough
+    }
+
+    let score = 5; // Base score for passing dominance
+
+    // Gate 3: Intent Proximity
+    // We boost highly if intent is found. 
+    // If strict mode is needed, we could return 0 if no intent found,
+    // but typically "Dominance + No Blacklist" is decent enough to keep 
+    // for broader volume, while Proximity gives high score.
+
+    const words = text.replace(/[^a-z0-9\s]/g, " ").split(/\s+/);
+    const triggerSet = new Set(INTENT_TRIGGERS);
+    const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+
+    // Find query indices
+    const queryIndices: number[] = [];
+    words.forEach((word, idx) => {
+        if (queryWords.some(qw => word.includes(qw))) {
+            queryIndices.push(idx);
         }
-    }
-    
-    let score = 0;
-    
-    // Exact query match: +5
-    if (text.includes(queryLower)) {
-        score += 5;
-    }
-    
-    // Query word matches: +1 each
-    for (const word of queryWords) {
-        if (text.includes(word)) {
-            score += 1;
+    });
+
+    let hasProximity = false;
+    const PROXIMITY_WINDOW = 15; // words
+
+    for (const idx of queryIndices) {
+        const start = Math.max(0, idx - PROXIMITY_WINDOW);
+        const end = Math.min(words.length, idx + PROXIMITY_WINDOW);
+
+        for (let i = start; i < end; i++) {
+            if (triggerSet.has(words[i])) {
+                score += 10;
+                hasProximity = true;
+                break;
+            }
         }
+        if (hasProximity) break;
     }
-    
-    // Expansion matches: +3 for phrase, +1 for partial
-    for (const exp of expansions) {
-        const expLower = exp.toLowerCase();
-        if (text.includes(expLower)) {
-            score += expLower.includes(" ") ? 3 : 1;
-        }
-    }
-    
-    // Title match bonus: title is more relevant than body
-    const titleLower = post.title.toLowerCase();
-    if (titleLower.includes(queryLower)) {
-        score += 3;
-    }
-    for (const word of queryWords) {
-        if (titleLower.includes(word)) {
-            score += 1;
-        }
-    }
-    
+
+    // Optional: If we want to be STRICT about intent (Gate 3 as requirement)
+    // Uncomment next line:
+    if (!hasProximity) return 0;
+
     return score;
 }
 
@@ -179,30 +142,21 @@ export function calculateRelevanceScore(
 export function filterByRelevance(
     posts: RawPost[],
     query: string,
-    minScore: number = 3
+    minScore: number = 5
 ): RawPost[] {
-    const category = findCategory(query);
-    
     const scored = posts.map((post) => ({
         post,
-        score: calculateRelevanceScore(post, query, category.expansions, category.exclusions),
+        score: calculateRelevanceScore(post, query),
     }));
-    
+
     const filtered = scored
         .filter((item) => item.score >= minScore)
         .sort((a, b) => b.score - a.score)
         .map((item) => item.post);
-    
+
     console.log(
         `Relevance filter: ${posts.length} posts → ${filtered.length} relevant (min score: ${minScore})`
     );
-    
-    return filtered;
-}
 
-/**
- * Get expansion dictionary for a query (for external use)
- */
-export function getQueryExpansions(query: string): { expansions: string[]; exclusions: string[] } {
-    return findCategory(query);
+    return filtered;
 }

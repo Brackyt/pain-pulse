@@ -4,11 +4,10 @@ import { queryToSlug, isValidSlug } from "@/lib/slug";
 import { checkRateLimit, getClientIP } from "@/lib/rate-limit";
 import { fetchRedditPosts, getSubredditBreakdown } from "@/lib/sources/reddit";
 import { fetchHNPosts, getHNBreakdown } from "@/lib/sources/hacker-news";
-import { fetchBestQuotes } from "@/lib/sources/reddit-comments";
 import { calculateStats, calculatePainSpikesFromCounts } from "@/lib/analysis/scoring";
-import { clusterThemes } from "@/lib/analysis/clustering";
+import { bucketPosts } from "@/lib/analysis/bucketing";
 import { generateBuildIdeas } from "@/lib/analysis/ideas";
-import { extractTopPhrases } from "@/lib/analysis/signals";
+import { extractTopPhrases, extractBestQuotes } from "@/lib/analysis/signals";
 import { filterByRelevance } from "@/lib/analysis/relevance";
 import { PulseReport, PulseReportFirestore, RawPost } from "@/types/pulse";
 
@@ -139,9 +138,9 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        console.log(`Generating report for: ${query}`);
+        console.log(`Generating Intent-First report for: ${query}`);
 
-        // Fetch data from sources in parallel
+        // 1. COLLECT: Fetch data using Intent Templates
         const [redditPosts, hnData] = await Promise.all([
             fetchRedditPosts(query).catch((e) => {
                 console.error("Reddit fetch failed:", e);
@@ -201,18 +200,11 @@ export async function POST(request: NextRequest) {
             hackernews: getHNBreakdown(hnData.monthly),
         };
 
-        // Fetch best quotes from Reddit comments (parallel with embeddings)
-        // AND run embedding-based clustering
-        const [bestQuotes, themes] = await Promise.all([
-            fetchBestQuotes(relevantRedditPosts, query, 10, 10).catch((e) => {
-                console.error("Quote extraction failed:", e);
-                return [];
-            }),
-            clusterThemes(allPosts, 5).catch((e) => {
-                console.error("Clustering failed:", e);
-                return [];
-            }),
-        ]);
+        // Buckets: Static Intent Buckets (Alternatives, Pricing, etc.)
+        const themes = await bucketPosts(allPosts, query);
+
+        // Quotes: Guaranteed extraction from top relevant posts
+        const bestQuotes = extractBestQuotes(allPosts, query, 6);
 
         // Generate build ideas based on themes
         const buildIdeas = generateBuildIdeas(themes, query);

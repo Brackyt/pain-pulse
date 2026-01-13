@@ -3,18 +3,17 @@ import { RawPost } from "@/types/pulse";
 const USER_AGENT = "PainPulse/1.0 (Market Research Tool)";
 
 // Intent-augmented query suffixes to find high-signal posts
+// Intent-based query templates to find high-signal posts
 const INTENT_QUERIES = [
-    "", // base query
-    "alternative",
-    "recommend",
-    "pricing",
-    "too expensive",
-    "problem",
-    "doesn't work",
-    "looking for",
-    "best app",
-    "frustrating",
-    "hate",
+    "best {K}",
+    "{K} alternative",
+    "alternative to {K}",
+    "{K} pricing",
+    "{K} too expensive",
+    "looking for {K}",
+    "recommend {K}",
+    "tool for {K}",
+    "how do you {K}",
 ];
 
 // Meme/low-signal indicators to filter out
@@ -164,8 +163,9 @@ export async function fetchRedditPosts(query: string): Promise<RawPost[]> {
     const seenIds = new Set<string>();
 
     // Build intent-augmented queries
-    const queries = INTENT_QUERIES.map((suffix) =>
-        suffix ? `${query} ${suffix}` : query
+    // Build intent queries by replacing {K} with the query
+    const queries = INTENT_QUERIES.map((template) =>
+        template.replace("{K}", query)
     );
 
     // Fetch from a subset of intent queries to stay within rate limits

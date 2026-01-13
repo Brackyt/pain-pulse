@@ -1,13 +1,15 @@
 import { RawPost } from "@/types/pulse";
 
 // Intent-augmented query suffixes
+// Intent-based query templates
 const INTENT_QUERIES = [
-    "", // base query
-    "alternative",
-    "recommend",
-    "problem",
-    "looking for",
-    "frustrated",
+    "best {K}",
+    "{K} alternative",
+    "alternative to {K}",
+    "{K} pricing",
+    "recommend {K}",
+    "problem with {K}",
+    "looking for {K}",
 ];
 
 interface HNHit {
@@ -110,8 +112,8 @@ async function fetchHNForWindow(
 
     // Use fewer intent queries for older data
     const numQueries = daysAgo <= 7 ? 4 : 2;
-    const queries = INTENT_QUERIES.slice(0, numQueries).map((suffix) =>
-        suffix ? `${query} ${suffix}` : query
+    const queries = INTENT_QUERIES.slice(0, numQueries).map((template) =>
+        template.replace("{K}", query)
     );
 
     for (let i = 0; i < queries.length; i++) {

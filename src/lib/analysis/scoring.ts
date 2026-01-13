@@ -1,5 +1,16 @@
 import { RawPost, PulseStats, PainSpike } from "@/types/pulse";
-import { analyzePost } from "./signals";
+
+// Simple keyword lists for scoring
+const PAIN_KEYWORDS = [
+    "hate", "annoying", "broken", "issue", "problem", "frustrated", "sucks",
+    "terrible", "worst", "awful", "useless", "waste", "disappointed", "bug",
+    "slow", "expensive", "hard", "difficult", "nightmare", "fail", "doesn't work"
+];
+
+const INTENT_KEYWORDS = [
+    "alternative", "recommend", "suggestion", "looking for", "switch", "replace",
+    "pricing", "cost", "buy", "purchase", "subscription", "tool", "app", "help"
+];
 
 /**
  * Calculate robust engagement score with log scaling
@@ -35,6 +46,27 @@ function sigmoid(x: number): number {
 }
 
 /**
+ * Analyze a single post for pain/intent scores locally
+ */
+function scorePost(post: RawPost): { painScore: number; intentScore: number } {
+    const text = `${post.title} ${post.body}`.toLowerCase();
+
+    let painScore = 0;
+    let intentScore = 0;
+
+    // Simple keyword counting
+    for (const word of PAIN_KEYWORDS) {
+        if (text.includes(word)) painScore += 2;
+    }
+
+    for (const word of INTENT_KEYWORDS) {
+        if (text.includes(word)) intentScore += 2;
+    }
+
+    return { painScore, intentScore };
+}
+
+/**
  * Calculate Pain Index (0-100)
  * Uses weighted patterns with caps and sigmoid normalization
  */
@@ -45,7 +77,7 @@ export function calculatePainIndex(posts: RawPost[]): number {
     let totalWeight = 0;
 
     for (const post of posts) {
-        const { painScore } = analyzePost(post);
+        const { painScore } = scorePost(post);
         const weight = getPostWeight(post);
 
         // Cap pain score at 8, then apply sigmoid
@@ -78,12 +110,12 @@ export function calculateOpportunityScore(
     let postsWithIntent = 0;
 
     for (const post of posts) {
-        const { painScore, buyerScore } = analyzePost(post);
+        const { painScore, intentScore } = scorePost(post);
         const weight = getPostWeight(post);
 
         // Cap scores at 8
         const cappedPain = Math.min(painScore, 8);
-        const cappedIntent = Math.min(buyerScore, 8);
+        const cappedIntent = Math.min(intentScore, 8);
 
         // Apply sigmoid
         const painSig = sigmoid(cappedPain - 2);
@@ -95,7 +127,7 @@ export function calculateOpportunityScore(
         totalOpportunity += weight * opportunity;
         totalWeight += weight;
 
-        if (buyerScore > 0) postsWithIntent++;
+        if (intentScore > 0) postsWithIntent++;
     }
 
     if (totalWeight === 0) return 0;
