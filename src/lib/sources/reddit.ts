@@ -155,6 +155,37 @@ function deduplicatePosts(posts: RawPost[]): RawPost[] {
 }
 
 /**
+ * Fetch top comments for a specific post
+ * Used to find "deep pain" signals (e.g. "I tried this and it failed")
+ */
+async function fetchPostComments(postId: string): Promise<string[]> {
+    const url = `https://www.reddit.com/comments/${postId}.json?sort=top&limit=10`;
+
+    try {
+        const response = await fetch(url, {
+            headers: { "User-Agent": USER_AGENT }
+        });
+
+        if (!response.ok) return [];
+
+        const data = await response.json();
+
+        // Reddit returns array: [postListing, commentListing]
+        if (!Array.isArray(data) || data.length < 2) return [];
+
+        const comments = data[1].data?.children || [];
+
+        return comments
+            .filter((c: any) => c.kind === "t1" && c.data?.body)
+            .map((c: any) => c.data.body);
+
+    } catch (error) {
+        console.error(`Failed to fetch comments for ${postId}:`, error);
+        return [];
+    }
+}
+
+/**
  * Fetch posts from Reddit using intent-augmented queries
  * This dramatically improves signal quality
  */
@@ -201,6 +232,24 @@ export async function fetchRedditPosts(query: string): Promise<RawPost[]> {
 
     // Deduplicate
     const deduped = deduplicatePosts(filtered);
+
+    // DEEP PAIN STEP: Enrich top posts with comments
+    // Sort by engagement to pick the best candidates for comment scraping
+    deduped.sort((a, b) => (b.score + b.comments * 2) - (a.score + a.comments * 2));
+
+    // Take top 15 posts for deep analysis
+    const deepScanParams = deduped.slice(0, 15);
+
+    console.log(`Deep Scan: Fetching comments for top ${deepScanParams.length} posts...`);
+
+    // Fetch comments in parallel (with small batching if needed, but 15 is mostly fine)
+    await Promise.all(
+        deepScanParams.map(async (post) => {
+            if (post.comments > 0) {
+                post.topComments = await fetchPostComments(post.id);
+            }
+        })
+    );
 
     console.log(
         `Reddit: Fetched ${allPosts.length} raw → ${filtered.length} filtered → ${deduped.length} unique`

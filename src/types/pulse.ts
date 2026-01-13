@@ -80,6 +80,7 @@ export interface RawPost {
     subreddit?: string; // Reddit only
     author?: string;
     isSelf?: boolean; // Reddit: true if self post
+    topComments?: string[]; // Top comments for deep pain analysis
 }
 
 // Firestore serializable version (with timestamps as numbers)

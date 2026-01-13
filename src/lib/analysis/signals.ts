@@ -139,49 +139,62 @@ export function extractPainReceipts(
     const topPosts = posts.slice(0, 30);
 
     for (const post of topPosts) {
-        // Split into rough sentences
-        const sentences = (post.body || "")
-            .split(/[.!?]+/)
-            .map(s => cleanQuote(s))
-            .filter(s => s.length > 5); // Ignore tiny fragments
+        const sourcesToCheck: string[] = [];
 
-        // Also evaluate title
-        sentences.push(cleanQuote(post.title));
+        // 1. Post Body
+        if (post.body) sourcesToCheck.push(post.body);
 
-        for (const sentence of sentences) {
-            const sLower = sentence.toLowerCase();
+        // 2. Post Title
+        sourcesToCheck.push(post.title);
 
-            if (uniqueTexts.has(sLower)) continue;
+        // 3. Top Comments (NEW: Deep Pain)
+        if (post.topComments) {
+            sourcesToCheck.push(...post.topComments);
+        }
 
-            const words = sentence.split(" ");
-            if (words.length < 8 || words.length > 45) continue;
+        // iterate all sources (body, title, comments)
+        for (const sourceText of sourcesToCheck) {
+            // Split into rough sentences
+            const sentences = (sourceText || "")
+                .split(/[.!?]+/)
+                .map(s => cleanQuote(s))
+                .filter(s => s.length > 5); // Ignore tiny fragments
 
-            let score = 0;
-            let hasPainTrigger = false;
+            for (const sentence of sentences) {
+                const sLower = sentence.toLowerCase();
 
-            for (const trigger of PAIN_TRIGGERS) {
-                if (sLower.includes(trigger)) {
-                    score += 10;
-                    hasPainTrigger = true;
-                    // Boost intense pain words
-                    if (["hate", "nightmare", "failed", "expensive"].includes(trigger)) score += 5;
+                if (uniqueTexts.has(sLower)) continue;
+
+                const words = sentence.split(" ");
+                if (words.length < 8 || words.length > 45) continue;
+
+                let score = 0;
+                let hasPainTrigger = false;
+
+                for (const trigger of PAIN_TRIGGERS) {
+                    if (sLower.includes(trigger)) {
+                        score += 10;
+                        hasPainTrigger = true;
+                        // Boost intense pain words
+                        if (["hate", "nightmare", "failed", "expensive"].includes(trigger)) score += 5;
+                    }
                 }
+
+                if (!hasPainTrigger) continue;
+
+                // Boost if it sounds like a narrative "we tried..."
+                if (sLower.includes("we tried") || sLower.includes("i tried") || sLower.includes("ended up")) {
+                    score += 5;
+                }
+
+                // Boost constraints in longform too
+                if (CONSTRAINT_TRIGGERS.some(t => sLower.includes(t))) {
+                    score += 5;
+                }
+
+                scoredQuotes.push({ text: sentence, score });
+                uniqueTexts.add(sLower);
             }
-
-            if (!hasPainTrigger) continue;
-
-            // Boost if it sounds like a narrative "we tried..."
-            if (sLower.includes("we tried") || sLower.includes("i tried") || sLower.includes("ended up")) {
-                score += 5;
-            }
-
-            // Boost constraints in longform too
-            if (CONSTRAINT_TRIGGERS.some(t => sLower.includes(t))) {
-                score += 5;
-            }
-
-            scoredQuotes.push({ text: sentence, score });
-            uniqueTexts.add(sLower);
         }
     }
 
@@ -204,52 +217,65 @@ export function extractPainPoints(posts: RawPost[], limit: number = 5): string[]
     const topPosts = posts.slice(0, 50); // Scan deep
 
     for (const post of topPosts) {
-        const sentences = (post.body || "")
-            .split(/[.!?]+/)
-            .map(s => cleanQuote(s))
-            .filter(s => s.length > 5);
+        const sourcesToCheck: string[] = [];
 
-        sentences.push(cleanQuote(post.title));
+        // 1. Post Body
+        if (post.body) sourcesToCheck.push(post.body);
+
+        // 2. Post Title
+        sourcesToCheck.push(post.title);
+
+        // 3. Top Comments (NEW)
+        if (post.topComments) {
+            sourcesToCheck.push(...post.topComments);
+        }
 
         // Engagement Factor: Logarithmic boost based on post score
         // score 10 -> +1, score 100 -> +2, score 1000 -> +3
         const engagementBoost = Math.max(0, Math.log10(post.score || 1) * 2);
 
-        for (const sentence of sentences) {
-            const sLower = sentence.toLowerCase();
+        for (const sourceText of sourcesToCheck) {
+            const sentences = (sourceText || "")
+                .split(/[.!?]+/)
+                .map(s => cleanQuote(s))
+                .filter(s => s.length > 5);
 
-            // Dedupe fuzzy matches (contains)
-            if ([...uniqueTexts].some(ut => ut.includes(sLower) || sLower.includes(ut))) continue;
+            for (const sentence of sentences) {
+                const sLower = sentence.toLowerCase();
 
-            const words = sentence.split(" ");
-            // Frictions should be punchy: 5-25 words
-            if (words.length < 5 || words.length > 25) continue;
+                // Dedupe fuzzy matches (contains)
+                if ([...uniqueTexts].some(ut => ut.includes(sLower) || sLower.includes(ut))) continue;
 
-            let score = 0;
-            let hasSignal = false;
+                const words = sentence.split(" ");
+                // Frictions should be punchy: 5-25 words
+                if (words.length < 5 || words.length > 25) continue;
 
-            // Constraint Check (Primary Signal for Frictions)
-            if (CONSTRAINT_TRIGGERS.some(t => sLower.includes(t))) {
-                score += 10;
-                hasSignal = true;
+                let score = 0;
+                let hasSignal = false;
+
+                // Constraint Check (Primary Signal for Frictions)
+                if (CONSTRAINT_TRIGGERS.some(t => sLower.includes(t))) {
+                    score += 10;
+                    hasSignal = true;
+                }
+
+                // Pain Trigger Check (Secondary but required if no constraint)
+                if (PAIN_TRIGGERS.some(t => sLower.includes(t))) {
+                    score += hasSignal ? 5 : 8; // Boost existing or base score
+                    hasSignal = true;
+                }
+
+                if (!hasSignal) continue;
+
+                // Narrative Boost (we tried, ended up)
+                if (sLower.includes("we tried") || sLower.includes("ended up")) score += 5;
+
+                // Apply Engagement Boost to the final score
+                score += engagementBoost;
+
+                scoredFrictions.push({ text: sentence, score });
+                uniqueTexts.add(sLower);
             }
-
-            // Pain Trigger Check (Secondary but required if no constraint)
-            if (PAIN_TRIGGERS.some(t => sLower.includes(t))) {
-                score += hasSignal ? 5 : 8; // Boost existing or base score
-                hasSignal = true;
-            }
-
-            if (!hasSignal) continue;
-
-            // Narrative Boost (we tried, ended up)
-            if (sLower.includes("we tried") || sLower.includes("ended up")) score += 5;
-
-            // Apply Engagement Boost to the final score
-            score += engagementBoost;
-
-            scoredFrictions.push({ text: sentence, score });
-            uniqueTexts.add(sLower);
         }
     }
 
