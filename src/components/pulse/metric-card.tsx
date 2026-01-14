@@ -1,43 +1,68 @@
+import { PainGaugeIcon, TargetIcon, VolumeIcon } from "@/components/ui/icons";
+
 interface MetricCardProps {
     value: number;
     label: string;
-    color: "red" | "green" | "blue" | "orange";
+    type: "pain" | "opportunity" | "volume";
     suffix?: string;
     trend?: number;
 }
 
-const colorClasses = {
-    red: "text-red-400",
-    green: "text-emerald-400",
-    blue: "text-sky-400",
-    orange: "text-orange-400",
+const typeConfig = {
+    pain: {
+        icon: PainGaugeIcon,
+        color: "text-red-400",
+        bgClass: "metric-card-pain",
+        iconBg: "bg-red-500/10 border-red-500/20",
+    },
+    opportunity: {
+        icon: TargetIcon,
+        color: "text-emerald-400",
+        bgClass: "metric-card-opportunity",
+        iconBg: "bg-emerald-500/10 border-emerald-500/20",
+    },
+    volume: {
+        icon: VolumeIcon,
+        color: "text-sky-400",
+        bgClass: "metric-card-volume",
+        iconBg: "bg-sky-500/10 border-sky-500/20",
+    },
 };
 
-export function MetricCard({ value, label, color, suffix, trend }: MetricCardProps) {
+export function MetricCard({ value, label, type, suffix, trend }: MetricCardProps) {
+    const config = typeConfig[type];
+    const Icon = config.icon;
+
     return (
-        <div className="group relative">
-            <div className="absolute -inset-1 bg-gradient-to-r from-white/5 to-white/0 rounded-2xl blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            <div className="relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:border-white/20 transition-colors">
-                <div className="flex items-baseline gap-2">
-                    <span className={`text-5xl font-bold ${colorClasses[color]}`}>
-                        {value}
-                    </span>
-                    {suffix && (
-                        <span className="text-2xl text-white/40">{suffix}</span>
-                    )}
-                    {trend !== undefined && trend !== 0 && (
-                        <span
-                            className={`text-sm font-medium ${trend > 0 ? "text-emerald-400" : "text-red-400"
-                                }`}
-                        >
-                            {trend > 0 ? "↑" : "↓"} {Math.abs(trend)}%
-                        </span>
-                    )}
+        <div className={`pulse-card metric-card ${config.bgClass}`}>
+            <div className="flex items-start justify-between mb-4">
+                <div className={`w-10 h-10 rounded-xl ${config.iconBg} border flex items-center justify-center`}>
+                    <Icon size={20} className={config.color} />
                 </div>
-                <p className="mt-2 text-sm text-white/50 uppercase tracking-wider">
-                    {label}
-                </p>
+                {trend !== undefined && trend !== 0 && (
+                    <span
+                        className={`text-sm font-medium px-2 py-1 rounded-lg ${trend > 0
+                                ? "text-red-400 bg-red-500/10"
+                                : "text-emerald-400 bg-emerald-500/10"
+                            }`}
+                    >
+                        {trend > 0 ? "↑" : "↓"} {Math.abs(trend)}%
+                    </span>
+                )}
             </div>
+
+            <div className="flex items-baseline gap-1">
+                <span className={`text-4xl md:text-5xl font-bold tabular-nums ${config.color}`}>
+                    {value}
+                </span>
+                {suffix && (
+                    <span className="text-lg text-white/30">{suffix}</span>
+                )}
+            </div>
+
+            <p className="mt-2 text-sm text-white/40 uppercase tracking-wide">
+                {label}
+            </p>
         </div>
     );
 }

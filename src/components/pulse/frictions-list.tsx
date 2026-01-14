@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { FlameIcon, CopyIcon, CheckIcon } from "@/components/ui/icons";
 
 interface FrictionsListProps {
     frictions: string[];
@@ -24,28 +25,41 @@ export function FrictionsList({ frictions }: FrictionsListProps) {
     }
 
     return (
-        <div className="bg-red-500/5 backdrop-blur-sm border border-red-500/10 rounded-2xl p-6">
-            <h3 className="text-xl font-bold text-red-100 mb-6 flex items-center gap-2">
-                <span className="animate-pulse">🔥</span> Top Frictions (Real Pain)
-            </h3>
+        <div className="pulse-card pulse-card-pain p-6">
+            <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+                    <FlameIcon size={20} className="text-red-400" />
+                </div>
+                <div>
+                    <h3 className="text-lg font-semibold text-white">Top Frictions</h3>
+                    <p className="text-sm text-white/40">Real pain points from the community</p>
+                </div>
+            </div>
 
             <div className="space-y-3">
                 {frictions.map((friction, index) => (
-                    <button
+                    <div
                         key={index}
-                        onClick={() => handleCopy(friction, index)}
-                        className="w-full group text-left p-4 bg-red-900/10 hover:bg-red-900/20 border border-red-500/10 hover:border-red-500/20 rounded-xl transition-all duration-200"
+                        className="group flex gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:border-red-500/20 hover:bg-red-500/[0.03] transition-all duration-200"
                     >
-                        <div className="flex gap-4">
-                            <span className="text-red-400 font-bold">•</span>
-                            <p className="text-red-100/90 text-md font-medium leading-relaxed">
-                                {friction}
-                            </p>
-                        </div>
-                        <p className="pl-6 mt-2 text-xs text-red-200/30 group-hover:text-red-200/50 transition-colors">
-                            {copiedIndex === index ? "✓ Copied!" : "Click to copy friction point"}
+                        <span className="shrink-0 w-6 h-6 rounded-lg bg-red-500/10 text-red-400 text-sm font-bold flex items-center justify-center">
+                            {index + 1}
+                        </span>
+                        <p className="flex-1 text-white/80 text-sm leading-relaxed">
+                            {friction}
                         </p>
-                    </button>
+                        <button
+                            onClick={() => handleCopy(friction, index)}
+                            className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-white/20 hover:text-white/60 hover:bg-white/5 transition-all cursor-pointer"
+                            title="Copy"
+                        >
+                            {copiedIndex === index ? (
+                                <CheckIcon size={16} className="text-emerald-400" />
+                            ) : (
+                                <CopyIcon size={16} />
+                            )}
+                        </button>
+                    </div>
                 ))}
             </div>
         </div>

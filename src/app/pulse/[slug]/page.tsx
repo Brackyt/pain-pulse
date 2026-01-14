@@ -12,6 +12,7 @@ import { BestQuotes } from "@/components/pulse/best-quotes";
 import { BuildIdeas } from "@/components/pulse/build-ideas";
 import { SourcesBreakdown } from "@/components/pulse/sources-breakdown";
 import { ShareButtons } from "@/components/pulse/share-buttons";
+import { PulseIcon } from "@/components/ui/icons";
 
 interface PageProps {
     params: Promise<{ slug: string }>;
@@ -95,15 +96,17 @@ export default async function PulsePage({ params }: PageProps) {
     return (
         <div className="pulse-gradient-bg pulse-pattern min-h-screen">
             {/* Navigation */}
-            <nav className="sticky top-0 z-50 bg-[#0f0f23]/80 backdrop-blur-lg border-b border-white/5 px-6 py-4">
-                <div className="max-w-7xl mx-auto flex items-center justify-between">
-                    <Link href="/" className="flex items-center gap-2 text-white">
-                        <span className="text-2xl">🔥</span>
-                        <span className="text-xl font-bold tracking-tight">Pain Pulse</span>
+            <nav className="sticky top-0 z-50 glass border-b border-white/5 px-6 py-3">
+                <div className="max-w-5xl mx-auto flex items-center justify-between">
+                    <Link href="/" className="flex items-center gap-3 text-white group">
+                        <div className="p-1.5 rounded-lg bg-gradient-to-br from-red-500/20 to-orange-500/20 border border-red-500/20">
+                            <PulseIcon size={18} className="text-red-400" />
+                        </div>
+                        <span className="text-lg font-bold tracking-tight">Pain Pulse</span>
                     </Link>
                     <Link
                         href="/"
-                        className="text-white/60 hover:text-white text-sm transition-colors flex items-center gap-2"
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-white/50 hover:text-white hover:bg-white/5 transition-colors"
                     >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -113,97 +116,94 @@ export default async function PulsePage({ params }: PageProps) {
                 </div>
             </nav>
 
-            <main className="max-w-6xl mx-auto px-6 py-12">
+            <main className="max-w-5xl mx-auto px-6 py-10">
                 {/* Header */}
-                <header className="text-center mb-12">
-                    <div className="inline-flex items-center gap-2 px-4 py-2 mb-6 bg-white/5 border border-white/10 rounded-full text-sm text-white/60">
-                        <span>Last updated: {formattedDate}</span>
+                <header className="text-center mb-10">
+                    <div className="pulse-chip mb-6 inline-flex">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span>Updated {formattedDate}</span>
                     </div>
 
-                    <h1 className="text-4xl md:text-6xl font-bold text-white mb-4">
+                    <h1 className="text-3xl md:text-5xl font-bold text-white mb-3 leading-tight">
                         Pain Report:{" "}
-                        <span className="bg-gradient-to-r from-red-400 via-orange-400 to-yellow-400 bg-clip-text text-transparent capitalize">
+                        <span className="text-gradient-warm capitalize">
                             {report.query}
                         </span>
                     </h1>
 
-                    <p className="text-lg text-white/50 max-w-2xl mx-auto">
+                    <p className="text-base text-white/40 max-w-lg mx-auto">
                         Analysis of {report.stats.volume} posts from the last {report.windowDays} days
                     </p>
                 </header>
 
                 {/* Share Buttons */}
-                <div className="flex justify-center mb-12">
+                <div className="flex justify-center mb-10">
                     <ShareButtons report={report} />
                 </div>
 
                 {/* Big Metrics */}
-                <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+                <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
                     <MetricCard
                         value={report.stats.painIndex}
                         label="Pain Index"
-                        color="red"
+                        type="pain"
                         suffix="/100"
                     />
                     <MetricCard
                         value={report.stats.opportunityScore}
                         label="Opportunity Score"
-                        color="green"
+                        type="opportunity"
                         suffix="/100"
                     />
                     <MetricCard
                         value={report.stats.volume}
                         label="Total Mentions"
-                        color="blue"
+                        type="volume"
                         trend={report.painSpikes.deltaPercent}
                     />
                 </section>
 
-                {/* Top Frictions (NEW SECTION) */}
-                <section className="mb-12">
+                {/* Top Frictions */}
+                <section className="mb-8">
                     <FrictionsList frictions={report.frictions || []} />
                 </section>
 
                 {/* Pain Spikes */}
-                <section className="mb-12">
+                <section className="mb-8">
                     <PainSpikes spikes={report.painSpikes} />
                 </section>
 
                 {/* Two Column Layout */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-                    {/* Pain Themes */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                     <ThemesList themes={report.themes} />
-
-                    {/* Top Phrases */}
                     <QuotesSection phrases={report.topPhrases} />
                 </div>
 
-                {/* Pain Receipts (Formerly Best Quotes) */}
-                {/* We use the same component but pass the new 'painReceipts' data */}
+                {/* Pain Receipts */}
                 {report.painReceipts && report.painReceipts.length > 0 && (
-                    <section className="mb-12">
+                    <section className="mb-8">
                         <BestQuotes quotes={report.painReceipts} />
                     </section>
                 )}
 
                 {/* Build Ideas */}
-                <section className="mb-12">
+                <section className="mb-8">
                     <BuildIdeas ideas={report.buildIdeas} />
                 </section>
 
                 {/* Sources Breakdown */}
-                <section className="mb-12">
+                <section className="mb-8">
                     <SourcesBreakdown breakdown={report.sourceBreakdown} />
                 </section>
 
                 {/* CTA */}
                 <section className="text-center py-12 border-t border-white/5">
-                    <h2 className="text-2xl font-bold text-white mb-4">
-                        Ready to explore another market?
+                    <h2 className="text-xl font-semibold text-white mb-4">
+                        Explore another market?
                     </h2>
                     <Link
                         href="/"
-                        className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white font-semibold rounded-xl transition-all duration-200"
+                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white font-medium rounded-xl transition-all duration-200 shadow-lg shadow-red-500/20"
                     >
                         Generate New Report
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -214,10 +214,10 @@ export default async function PulsePage({ params }: PageProps) {
             </main>
 
             {/* Footer */}
-            <footer className="border-t border-white/5 px-6 py-8">
-                <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-white/40">
+            <footer className="border-t border-white/5 px-6 py-6">
+                <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-white/30">
                     <div className="flex items-center gap-2">
-                        <span>🔥</span>
+                        <PulseIcon size={14} className="text-red-400/60" />
                         <span>Pain Pulse</span>
                     </div>
                     <div>Built for makers who solve real problems.</div>

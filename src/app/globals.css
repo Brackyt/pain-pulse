@@ -119,28 +119,272 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
 }
 
-/* Pain Pulse custom styles */
+/* ============================================
+   Pain Pulse Custom Design System
+   ============================================ */
+
+/* Premium dark background - no more blue vignette */
 .pulse-gradient-bg {
-  background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+  background:
+    linear-gradient(180deg, #0a0a0f 0%, #0d0d14 100%);
   min-height: 100vh;
+  position: relative;
 }
 
-.pulse-pattern {
-  background-image: 
-    radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.15) 0%, transparent 50%),
-    radial-gradient(circle at 80% 20%, rgba(255, 107, 107, 0.1) 0%, transparent 50%),
-    radial-gradient(circle at 40% 40%, rgba(255, 198, 92, 0.05) 0%, transparent 40%);
+/* Subtle noise texture overlay for depth */
+.pulse-gradient-bg::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  opacity: 0.015;
+  pointer-events: none;
+  z-index: 0;
 }
+
+/* Refined ambient glow - subtle warm tones */
+.pulse-pattern {
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(239, 68, 68, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 40% at 100% 50%, rgba(249, 115, 22, 0.04) 0%, transparent 40%);
+}
+
+/* ============================================
+   Card System
+   ============================================ */
+
+/* Base card with subtle inner glow */
+.pulse-card {
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.pulse-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg,
+      rgba(255, 255, 255, 0.1) 0%,
+      transparent 50%,
+      transparent 100%);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.pulse-card:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+  transform: translateY(-2px);
+  box-shadow:
+    0 20px 40px -12px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+/* Card variants */
+.pulse-card-pain {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.06) 0%, rgba(239, 68, 68, 0.02) 100%);
+  border-color: rgba(239, 68, 68, 0.15);
+}
+
+.pulse-card-success {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.06) 0%, rgba(34, 197, 94, 0.02) 100%);
+  border-color: rgba(34, 197, 94, 0.15);
+}
+
+.pulse-card-info {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.06) 0%, rgba(59, 130, 246, 0.02) 100%);
+  border-color: rgba(59, 130, 246, 0.15);
+}
+
+/* ============================================
+   Metric Cards
+   ============================================ */
+
+.metric-card {
+  position: relative;
+  padding: 24px;
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.metric-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  filter: blur(40px);
+  opacity: 0.15;
+  pointer-events: none;
+}
+
+.metric-card-pain::after {
+  background: #ef4444;
+}
+
+.metric-card-opportunity::after {
+  background: #22c55e;
+}
+
+.metric-card-volume::after {
+  background: #3b82f6;
+}
+
+/* ============================================
+   Progress Bars / Heat Bars
+   ============================================ */
+
+.heat-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  position: relative;
+}
+
+.heat-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  position: relative;
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.heat-bar-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.3) 50%,
+      transparent 100%);
+  animation: heat-shimmer 2s ease-in-out infinite;
+}
+
+@keyframes heat-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.heat-bar-pain .heat-bar-fill {
+  background: linear-gradient(90deg, #dc2626 0%, #f97316 100%);
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
+}
+
+.heat-bar-cool .heat-bar-fill {
+  background: linear-gradient(90deg, #0ea5e9 0%, #3b82f6 100%);
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+}
+
+/* ============================================
+   Typography Enhancements
+   ============================================ */
+
+.text-gradient-warm {
+  background: linear-gradient(135deg, #f87171 0%, #fb923c 50%, #fbbf24 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-gradient-cool {
+  background: linear-gradient(135deg, #60a5fa 0%, #818cf8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Quote styling */
+.pull-quote {
+  position: relative;
+  padding-left: 1.5rem;
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.pull-quote::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #f97316 0%, #ef4444 100%);
+}
+
+/* ============================================
+   Interactive Elements
+   ============================================ */
+
+/* Badge / Chip */
+.pulse-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 100px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+  transition: all 0.2s ease;
+}
+
+.pulse-chip:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Tag buttons (example keywords) */
+.pulse-tag {
+  padding: 10px 18px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.pulse-tag:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+  transform: translateY(-1px);
+}
+
+/* ============================================
+   Animations
+   ============================================ */
 
 @keyframes float {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateY(0);
   }
+
   50% {
     transform: translateY(-10px);
   }
@@ -151,9 +395,12 @@
 }
 
 @keyframes pulse-glow {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 0.5;
   }
+
   50% {
     opacity: 1;
   }
@@ -161,4 +408,85 @@
 
 .animate-pulse-glow {
   animation: pulse-glow 3s ease-in-out infinite;
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.8;
+  }
+
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 2s ease-out infinite;
+}
+
+/* Subtle entrance animation */
+@keyframes fade-up {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.5s ease-out forwards;
+}
+
+/* Live indicator pulse */
+@keyframes live-pulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+  }
+
+  50% {
+    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+  }
+}
+
+.animate-live-pulse {
+  animation: live-pulse 2s ease-in-out infinite;
+}
+
+/* Number counter animation helper */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================
+   Utility Classes
+   ============================================ */
+
+.glass {
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.glow-red {
+  box-shadow: 0 0 30px rgba(239, 68, 68, 0.2);
+}
+
+.glow-orange {
+  box-shadow: 0 0 30px rgba(249, 115, 22, 0.2);
+}
+
+.glow-green {
+  box-shadow: 0 0 30px rgba(34, 197, 94, 0.2);
+}
+
+.glow-blue {
+  box-shadow: 0 0 30px rgba(59, 130, 246, 0.2);
 }
