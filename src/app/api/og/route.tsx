@@ -5,13 +5,10 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const slug = searchParams.get("slug");
 
-    // Fetch Inter font from jsDelivr (reliable CDN)
-    const fontData = await fetch(
-        new URL('https://cdn.jsdelivr.net/npm/@fontsource/inter@5.0.8/files/inter-latin-700-normal.woff', import.meta.url)
-    ).then((res) => res.arrayBuffer()).catch(e => {
-        console.error("Font load failed", e);
-        return null;
-    });
+    // Load font from local file system
+    const fontData = await fetch(new URL('./Inter-Bold.woff', import.meta.url)).then(
+        (res) => res.arrayBuffer()
+    );
 
     if (!slug) {
         return new Response("Missing slug parameter", { status: 400 });
@@ -226,14 +223,17 @@ export async function GET(request: NextRequest) {
             {
                 width: 1200,
                 height: 630,
-                fonts: fontData ? [
+                fonts: [
                     {
                         name: 'Inter',
                         data: fontData,
                         style: 'normal',
                         weight: 700,
                     },
-                ] : [],
+                ],
+                headers: {
+                    "Cache-Control": "public, max-age=3600, immutable",
+                },
             }
         );
     } catch (error) {
