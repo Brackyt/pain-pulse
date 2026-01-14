@@ -206,3 +206,24 @@ export function getGitHubBreakdown(posts: RawPost[]): GitHubRepoBreakdown[] {
         .sort((a, b) => b.count - a.count)
         .slice(0, 5);
 }
+
+// Self-register with the source registry
+import { registerSource, BreakdownItem } from "./registry";
+
+function getGitHubBreakdownForRegistry(posts: RawPost[]): BreakdownItem[] {
+    return getGitHubBreakdown(posts).map(item => ({
+        label: item.name,
+        url: item.url,
+        count: item.count,
+    }));
+}
+
+registerSource({
+    id: "github",
+    name: "GitHub Issues",
+    color: "gray-100",
+    icon: null,
+    fetch: fetchGitHubPosts,
+    getBreakdown: getGitHubBreakdownForRegistry,
+    breakdownTitle: "Top Repositories",
+});

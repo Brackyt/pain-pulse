@@ -188,3 +188,30 @@ export function getHNBreakdown(
             points: post.score,
         }));
 }
+
+// Self-register with the source registry
+import { registerSource, BreakdownItem } from "./registry";
+
+function getHNBreakdownForRegistry(posts: RawPost[]): BreakdownItem[] {
+    return getHNBreakdown(posts).map(item => ({
+        label: item.title.length > 50 ? item.title.slice(0, 47) + "..." : item.title,
+        url: item.url,
+        count: item.points,
+    }));
+}
+
+// Wrapper to return flat array (HN has weekly/monthly structure)
+async function fetchHNPostsFlat(query: string): Promise<RawPost[]> {
+    const { monthly } = await fetchHNPosts(query);
+    return monthly;
+}
+
+registerSource({
+    id: "hackernews",
+    name: "Hacker News",
+    color: "orange-400",
+    icon: null,
+    fetch: fetchHNPostsFlat,
+    getBreakdown: getHNBreakdownForRegistry,
+    breakdownTitle: "Top Discussions",
+});

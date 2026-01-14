@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/firebase-admin";
 import { queryToSlug, isValidSlug } from "@/lib/slug";
 import { checkRateLimit, getClientIP } from "@/lib/rate-limit";
-import { fetchRedditPosts, getSubredditBreakdown } from "@/lib/sources/reddit";
-import { fetchHNPosts, getHNBreakdown } from "@/lib/sources/hacker-news";
-import { fetchGitHubPosts, getGitHubBreakdown } from "@/lib/sources/github";
-import { fetchDevToPosts, getDevToBreakdown } from "@/lib/sources/devto";
+import { fetchRedditPosts } from "@/lib/sources/reddit";
+import { fetchHNPosts } from "@/lib/sources/hacker-news";
+import { getAllSources, BreakdownItem } from "@/lib/sources/registry";
+// Import sources to trigger self-registration
+import "@/lib/sources/reddit";
+import "@/lib/sources/hacker-news";
+import "@/lib/sources/github";
+import "@/lib/sources/devto";
 import { calculateStats, calculatePainSpikesFromCounts } from "@/lib/analysis/scoring";
 import { bucketPosts } from "@/lib/analysis/bucketing";
 import { generateBuildIdeas } from "@/lib/analysis/ideas";
@@ -155,34 +159,26 @@ export async function POST(request: NextRequest) {
 
         console.log(`Generating Intent-First report for: ${query}`);
 
-        // 1. COLLECT: Fetch data using Intent Templates
+        // 1. COLLECT: Fetch data from all registered sources
         let redditRateLimited = false;
-        const [redditPosts, hnData, githubData, devtoData] = await Promise.all([
-            fetchRedditPosts(query).catch((e) => {
-                if (e instanceof Error && e.message === "REDDIT_RATE_LIMITED") {
-                    console.warn("Reddit rate limited");
-                    redditRateLimited = true;
+        const sources = getAllSources();
+
+        const sourceResults = await Promise.all(
+            sources.map(source =>
+                source.fetch(query).catch((e) => {
+                    if (e instanceof Error && e.message === "REDDIT_RATE_LIMITED") {
+                        console.warn(`${source.name} rate limited`);
+                        if (source.id === 'reddit') redditRateLimited = true;
+                        return [] as RawPost[];
+                    }
+                    console.error(`${source.name} fetch failed:`, e);
                     return [] as RawPost[];
-                }
-                console.error("Reddit fetch failed:", e);
-                return [] as RawPost[];
-            }),
-            fetchHNPosts(query).catch((e) => {
-                console.error("HN fetch failed:", e);
-                return { weekly: [] as RawPost[], monthly: [] as RawPost[] };
-            }),
-            fetchGitHubPosts(query).catch((e) => {
-                console.error("GitHub fetch failed:", e);
-                return [] as RawPost[];
-            }),
-            fetchDevToPosts(query).catch((e) => {
-                console.error("Dev.to fetch failed:", e);
-                return [] as RawPost[];
-            }),
-        ]);
+                })
+            )
+        );
 
         // Combine all posts for analysis
-        const allPostsRaw = [...redditPosts, ...hnData.monthly, ...githubData, ...devtoData];
+        const allPostsRaw = sourceResults.flat();
 
         if (allPostsRaw.length === 0) {
             if (redditRateLimited) {
@@ -234,13 +230,11 @@ export async function POST(request: NextRequest) {
         // Let's keep a global list for the UI sidebar, but make sure it uses the new logic
         const topPhrases = extractTopPhrases(allPosts, 20);
 
-        // Source breakdown (use filtered posts)
-        const sourceBreakdown = {
-            reddit: getSubredditBreakdown(allPosts.filter(p => p.source === 'reddit')),
-            hackernews: getHNBreakdown(hnData.monthly),
-            github: getGitHubBreakdown(allPosts.filter(p => p.source === 'github')),
-            devto: getDevToBreakdown(allPosts.filter(p => p.source === 'devto')),
-        };
+        // Source breakdown (use dynamic registry)
+        const sourceBreakdown: Record<string, BreakdownItem[]> = {};
+        for (const source of sources) {
+            sourceBreakdown[source.id] = source.getBreakdown(allPosts);
+        }
 
         // Pain Extraction (The Pivot)
         // 1. Top Frictions: Short impactful pain statements

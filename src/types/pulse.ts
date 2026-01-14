@@ -20,7 +20,7 @@ export interface Theme {
 export interface SourceLink {
     title: string;
     url: string;
-    source: "reddit" | "hackernews" | "github" | "devto" | "stackoverflow";
+    source: string; // Dynamic source ID
 }
 
 export interface BuildIdea {
@@ -29,13 +29,14 @@ export interface BuildIdea {
     targetUser: string;
 }
 
-export interface SourceBreakdown {
-    reddit: SubredditBreakdown[];
-    hackernews: HNThreadBreakdown[];
-    github: GitHubRepoBreakdown[];
-    devto: DevToTagBreakdown[];
-}
+// Re-export BreakdownItem from registry for convenience
+export type { BreakdownItem } from "@/lib/sources/registry";
 
+// Dynamic source breakdown - keys are source IDs
+import type { BreakdownItem } from "@/lib/sources/registry";
+export type SourceBreakdown = Record<string, BreakdownItem[]>;
+
+// Legacy types (kept for backwards compatibility with existing data)
 export interface DevToTagBreakdown {
     tag: string;
     url: string;

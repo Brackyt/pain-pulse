@@ -291,3 +291,24 @@ export function getSubredditBreakdown(
         .sort((a, b) => b.count - a.count)
         .slice(0, 10);
 }
+
+// Self-register with the source registry
+import { registerSource, BreakdownItem } from "./registry";
+
+function getRedditBreakdown(posts: RawPost[]): BreakdownItem[] {
+    return getSubredditBreakdown(posts.filter(p => p.source === 'reddit')).map(item => ({
+        label: `r/${item.subreddit}`,
+        url: `https://reddit.com/r/${item.subreddit}`,
+        count: item.count,
+    }));
+}
+
+registerSource({
+    id: "reddit",
+    name: "Reddit",
+    color: "orange-500",
+    icon: null, // Will be set in UI component
+    fetch: fetchRedditPosts,
+    getBreakdown: getRedditBreakdown,
+    breakdownTitle: "Top Subreddits",
+});

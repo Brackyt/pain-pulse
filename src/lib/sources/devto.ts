@@ -180,3 +180,24 @@ export function getDevToBreakdown(posts: RawPost[]): DevToTagBreakdown[] {
         .sort((a, b) => b.count - a.count)
         .slice(0, 5);
 }
+
+// Self-register with the source registry
+import { registerSource, BreakdownItem } from "./registry";
+
+function getDevToBreakdownForRegistry(posts: RawPost[]): BreakdownItem[] {
+    return getDevToBreakdown(posts).map(item => ({
+        label: `#${item.tag}`,
+        url: item.url,
+        count: item.count,
+    }));
+}
+
+registerSource({
+    id: "devto",
+    name: "Dev.to",
+    color: "gray-100",
+    icon: null,
+    fetch: fetchDevToPosts,
+    getBreakdown: getDevToBreakdownForRegistry,
+    breakdownTitle: "Top Tags",
+});
