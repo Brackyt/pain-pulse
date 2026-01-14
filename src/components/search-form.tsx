@@ -66,7 +66,7 @@ export function SearchForm() {
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
                             placeholder="Enter a keyword..."
-                            className="flex-1 bg-transparent border-0 text-base text-white placeholder:text-white/30 focus-visible:ring-0 focus-visible:ring-offset-0 px-4"
+                            className="flex-1 bg-transparent border-0 text-base text-white placeholder:text-white/30 focus-visible:ring-0 focus-visible:ring-offset-0 px-4 rounded-xl"
                             style={{ minHeight: '56px' }}
                             disabled={loading}
                         />
