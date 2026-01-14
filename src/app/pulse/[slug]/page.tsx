@@ -13,6 +13,8 @@ import { BuildIdeas } from "@/components/pulse/build-ideas";
 import { SourcesBreakdown } from "@/components/pulse/sources-breakdown";
 import { ShareButtons } from "@/components/pulse/share-buttons";
 import { PulseIcon } from "@/components/ui/icons";
+import { AuroraBackground } from "@/components/ui/aurora-background";
+import { ScrollReveal } from "@/components/ui/scroll-reveal";
 
 interface PageProps {
     params: Promise<{ slug: string }>;
@@ -103,7 +105,7 @@ export default async function PulsePage({ params }: PageProps) {
     }).format(report.updatedAt);
 
     return (
-        <div className="pulse-gradient-bg pulse-pattern min-h-screen">
+        <AuroraBackground intensity="medium">
             {/* Navigation */}
             <nav className="sticky top-0 z-50 glass border-b border-white/5 px-6 py-3">
                 <div className="max-w-5xl mx-auto flex items-center justify-between">
@@ -127,50 +129,56 @@ export default async function PulsePage({ params }: PageProps) {
 
             <main className="max-w-5xl mx-auto px-6 py-10">
                 {/* Header */}
-                <header className="text-center mb-10">
-                    <div className="pulse-chip mb-6 inline-flex">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        <span>Updated {formattedDate}</span>
-                    </div>
+                <ScrollReveal>
+                    <header className="text-center mb-10">
+                        <div className="pulse-chip mb-6 inline-flex">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            <span>Updated {formattedDate}</span>
+                        </div>
 
-                    <h1 className="text-3xl md:text-5xl font-bold text-white mb-3 leading-tight">
-                        Pain Report:{" "}
-                        <span className="text-gradient-warm capitalize">
-                            {report.query}
-                        </span>
-                    </h1>
+                        <h1 className="text-3xl md:text-5xl font-bold text-white mb-3 leading-tight">
+                            Pain Report:{" "}
+                            <span className="text-gradient-warm capitalize">
+                                {report.query}
+                            </span>
+                        </h1>
 
-                    <p className="text-base text-white/40 max-w-lg mx-auto">
-                        Analysis of {report.stats.volume} posts from the last {report.windowDays} days
-                    </p>
-                </header>
+                        <p className="text-base text-white/40 max-w-lg mx-auto">
+                            Analysis of {report.stats.volume} posts from the last {report.windowDays} days
+                        </p>
+                    </header>
+                </ScrollReveal>
 
                 {/* Share Buttons */}
-                <div className="flex justify-center mb-10">
-                    <ShareButtons report={report} />
-                </div>
+                <ScrollReveal delay={100}>
+                    <div className="flex justify-center mb-10">
+                        <ShareButtons report={report} />
+                    </div>
+                </ScrollReveal>
 
-                {/* Big Metrics */}
-                <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
-                    <MetricCard
-                        value={report.stats.painIndex}
-                        label="Pain Index"
-                        type="pain"
-                        suffix="/100"
-                    />
-                    <MetricCard
-                        value={report.stats.opportunityScore}
-                        label="Opportunity Score"
-                        type="opportunity"
-                        suffix="/100"
-                    />
-                    <MetricCard
-                        value={report.stats.volume}
-                        label="Total Mentions"
-                        type="volume"
-                        trend={report.painSpikes.deltaPercent}
-                    />
-                </section>
+                {/* Big Metrics - Bento Style */}
+                <ScrollReveal delay={200}>
+                    <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
+                        <MetricCard
+                            value={report.stats.painIndex}
+                            label="Pain Index"
+                            type="pain"
+                            suffix="/100"
+                        />
+                        <MetricCard
+                            value={report.stats.opportunityScore}
+                            label="Opportunity Score"
+                            type="opportunity"
+                            suffix="/100"
+                        />
+                        <MetricCard
+                            value={report.stats.volume}
+                            label="Total Mentions"
+                            type="volume"
+                            trend={report.painSpikes.deltaPercent}
+                        />
+                    </section>
+                </ScrollReveal>
 
                 {/* Top Frictions */}
                 <section className="mb-8">
@@ -206,20 +214,22 @@ export default async function PulsePage({ params }: PageProps) {
                 </section>
 
                 {/* CTA */}
-                <section className="text-center py-12 border-t border-white/5">
-                    <h2 className="text-xl font-semibold text-white mb-4">
-                        Explore another market?
-                    </h2>
-                    <Link
-                        href="/"
-                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white font-medium rounded-xl transition-all duration-200 shadow-lg shadow-red-500/20"
-                    >
-                        Generate New Report
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                        </svg>
-                    </Link>
-                </section>
+                <ScrollReveal>
+                    <section className="text-center py-12 border-t border-white/5">
+                        <h2 className="text-xl font-semibold text-white mb-4">
+                            Explore another market?
+                        </h2>
+                        <Link
+                            href="/"
+                            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white font-medium rounded-xl transition-all duration-200 shadow-lg shadow-red-500/25 hover:shadow-red-500/40 hover:scale-105"
+                        >
+                            Generate New Report
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                            </svg>
+                        </Link>
+                    </section>
+                </ScrollReveal>
             </main>
 
             {/* Footer */}
@@ -232,6 +242,6 @@ export default async function PulsePage({ params }: PageProps) {
                     <div>Built for makers who solve real problems.</div>
                 </div>
             </footer>
-        </div>
+        </AuroraBackground>
     );
 }

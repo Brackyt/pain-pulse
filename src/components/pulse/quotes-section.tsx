@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { TopPhrase } from "@/types/pulse";
 import { QuoteIcon, CopyIcon, CheckIcon } from "@/components/ui/icons";
+import { ScrollReveal } from "@/components/ui/scroll-reveal";
 
 interface QuotesSectionProps {
     phrases: TopPhrase[];
@@ -35,44 +36,60 @@ export function QuotesSection({ phrases }: QuotesSectionProps) {
         );
     }
 
-    return (
-        <div className="pulse-card p-6">
-            <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-                    <QuoteIcon size={20} className="text-amber-400" />
-                </div>
-                <div>
-                    <h3 className="text-lg font-semibold text-white">Top Phrasing</h3>
-                    <p className="text-sm text-white/40">Common phrases & patterns</p>
-                </div>
-            </div>
+    // Get max count for relative sizing
+    const maxCount = Math.max(...phrases.map(p => p.count));
 
-            <div className="space-y-2">
-                {phrases.map((phrase, index) => (
-                    <div
-                        key={index}
-                        className="group flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:border-amber-500/20 hover:bg-amber-500/[0.02] transition-all"
-                    >
-                        <span className="shrink-0 text-xs text-white/30 tabular-nums w-8 text-right">
-                            {phrase.count}×
-                        </span>
-                        <span className="flex-1 text-white/70 text-sm truncate">
-                            &ldquo;{phrase.phrase}&rdquo;
-                        </span>
-                        <button
-                            onClick={() => handleCopy(phrase.phrase, index)}
-                            className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-white/20 hover:text-white/60 hover:bg-white/5 transition-all cursor-pointer"
-                            title="Copy"
-                        >
-                            {copiedIndex === index ? (
-                                <CheckIcon size={14} className="text-emerald-400" />
-                            ) : (
-                                <CopyIcon size={14} />
-                            )}
-                        </button>
+    return (
+        <ScrollReveal>
+            <div className="pulse-card p-6 md:p-8 h-full">
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                        <QuoteIcon size={20} className="text-amber-400" />
                     </div>
-                ))}
+                    <div>
+                        <h3 className="text-lg font-semibold text-white">Top Phrasing</h3>
+                        <p className="text-sm text-white/40">Common phrases & patterns</p>
+                    </div>
+                </div>
+
+                <div className="space-y-2">
+                    {phrases.map((phrase, index) => {
+                        const relativeWidth = (phrase.count / maxCount) * 100;
+
+                        return (
+                            <ScrollReveal key={index} delay={index * 50}>
+                                <div
+                                    className="group relative flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:border-amber-500/20 hover:bg-amber-500/[0.02] transition-all overflow-hidden"
+                                >
+                                    {/* Background bar visualization */}
+                                    <div
+                                        className="absolute inset-y-0 left-0 bg-gradient-to-r from-amber-500/10 to-transparent transition-all duration-500"
+                                        style={{ width: `${relativeWidth}%` }}
+                                    />
+
+                                    <span className="relative shrink-0 text-xs text-amber-400/80 bg-amber-500/10 px-2 py-1 rounded-md tabular-nums font-medium">
+                                        {phrase.count}×
+                                    </span>
+                                    <span className="relative flex-1 text-white/70 text-sm truncate">
+                                        &ldquo;{phrase.phrase}&rdquo;
+                                    </span>
+                                    <button
+                                        onClick={() => handleCopy(phrase.phrase, index)}
+                                        className="relative shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-white/20 hover:text-white/60 hover:bg-white/5 transition-all cursor-pointer opacity-0 group-hover:opacity-100"
+                                        title="Copy"
+                                    >
+                                        {copiedIndex === index ? (
+                                            <CheckIcon size={14} className="text-emerald-400" />
+                                        ) : (
+                                            <CopyIcon size={14} />
+                                        )}
+                                    </button>
+                                </div>
+                            </ScrollReveal>
+                        );
+                    })}
+                </div>
             </div>
-        </div>
+        </ScrollReveal>
     );
 }
