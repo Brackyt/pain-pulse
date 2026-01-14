@@ -22,14 +22,14 @@
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS 4 + shadcn/ui
 - **Database**: Firebase Firestore (server-only)
-- **Deployment**: Firebase Hosting
+- **Deployment**: Firebase Hosting (Next.js Web Frameworks)
 
 ## Getting Started
 
 ### Prerequisites
 
 - Node.js 20+
-- Firebase project with Firestore enabled
+- Firebase project with Firestore and Hosting enabled
 
 ### Installation
 
@@ -86,13 +86,13 @@ npm start
 
 ## Deployment
 
-### Firebase Hosting (Recommended)
+### Firebase Hosting
 
 1. Install Firebase CLI: `npm install -g firebase-tools`
 2. Login: `firebase login`
 3. Enable web frameworks: `firebase experiments:enable webframeworks`
 4. Deploy: `firebase deploy --only hosting`
-5. Set environment variables in the Firebase Console or via CLI.
+5. Set environment variables in the Firebase Console (Environment Configuration for Functions).
 
 > ⚠️ **Note**: Environment variables use `FB_*` prefix instead of `FIREBASE_*` because Firebase Cloud Functions reserves that prefix.
 
