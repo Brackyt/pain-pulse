@@ -53,28 +53,31 @@ export function SearchForm() {
     };
 
     return (
-        <div className="w-full max-w-xl mx-auto">
+        <div className="w-full max-w-xl mx-auto px-4 sm:px-0">
             <form onSubmit={handleSubmit} className="relative">
                 <div className="relative group">
                     {/* Subtle glow on focus */}
                     <div className="absolute -inset-px bg-gradient-to-r from-red-500/20 via-orange-500/20 to-red-500/20 rounded-2xl blur-lg opacity-0 group-focus-within:opacity-100 transition-opacity duration-500" />
 
-                    <div className="relative flex gap-2 bg-white/[0.03] border border-white/10 rounded-2xl p-2 group-focus-within:border-white/20 transition-colors">
+                    {/* Stack on mobile, side-by-side on larger screens */}
+                    <div className="relative flex flex-col sm:flex-row gap-2 bg-white/[0.03] border border-white/10 rounded-2xl p-2 group-focus-within:border-white/20 transition-colors">
                         <Input
                             type="text"
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
-                            placeholder="Enter a keyword (e.g., invoice, CRM, email...)"
-                            className="flex-1 bg-transparent border-0 text-base text-white placeholder:text-white/30 focus-visible:ring-0 focus-visible:ring-offset-0 h-12 px-4"
+                            placeholder="Enter a keyword..."
+                            className="flex-1 bg-transparent border-0 text-base text-white placeholder:text-white/30 focus-visible:ring-0 focus-visible:ring-offset-0 px-4"
+                            style={{ minHeight: '56px' }}
                             disabled={loading}
                         />
                         <Button
                             type="submit"
                             disabled={loading || !query.trim()}
-                            className="h-12 px-6 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white font-medium rounded-xl transition-all duration-200 disabled:opacity-50 shadow-lg shadow-red-500/20"
+                            style={{ minHeight: '56px' }}
+                            className="px-6 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white font-medium rounded-xl transition-all duration-200 disabled:opacity-50 shadow-lg shadow-red-500/20 w-full sm:w-auto"
                         >
                             {loading ? (
-                                <span className="flex items-center gap-2">
+                                <span className="flex items-center justify-center gap-2">
                                     <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
                                         <circle
                                             className="opacity-25"
