@@ -53,9 +53,9 @@ cp .env.example .env.local
 Edit `.env.local` with your Firebase credentials:
 
 ```bash
-FIREBASE_PROJECT_ID=your-project-id
-FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@your-project.iam.gserviceaccount.com
-FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+FB_PROJECT_ID=your-project-id
+FB_CLIENT_EMAIL=firebase-adminsdk-xxxxx@your-project.iam.gserviceaccount.com
+FB_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 NEXT_PUBLIC_BASE_URL=http://localhost:3000
 ```
 
@@ -65,9 +65,9 @@ NEXT_PUBLIC_BASE_URL=http://localhost:3000
 2. Select your project → **Project Settings** → **Service Accounts**
 3. Click **"Generate new private key"**
 4. Open the downloaded JSON and copy the values:
-   - `project_id` → `FIREBASE_PROJECT_ID`
-   - `client_email` → `FIREBASE_CLIENT_EMAIL`
-   - `private_key` → `FIREBASE_PRIVATE_KEY`
+   - `project_id` → `FB_PROJECT_ID`
+   - `client_email` → `FB_CLIENT_EMAIL`
+   - `private_key` → `FB_PRIVATE_KEY`
 
 ### Development
 
@@ -86,16 +86,15 @@ npm start
 
 ## Deployment
 
-### Vercel (Recommended)
+### Firebase Hosting (Recommended)
 
-1. Push your code to GitHub
-2. Import the project into [Vercel](https://vercel.com)
-3. Add environment variables in **Settings → Environment Variables**:
-   - `FIREBASE_PROJECT_ID`
-   - `FIREBASE_CLIENT_EMAIL`
-   - `FIREBASE_PRIVATE_KEY`
-   - `NEXT_PUBLIC_BASE_URL` (e.g., `https://painpulse.app`)
-4. Deploy!
+1. Install Firebase CLI: `npm install -g firebase-tools`
+2. Login: `firebase login`
+3. Enable web frameworks: `firebase experiments:enable webframeworks`
+4. Deploy: `firebase deploy --only hosting`
+5. Set environment variables in the Firebase Console or via CLI.
+
+> ⚠️ **Note**: Environment variables use `FB_*` prefix instead of `FIREBASE_*` because Firebase Cloud Functions reserves that prefix.
 
 > ⚠️ **Security**: Never commit `.env.local` or any secrets to git. The `.gitignore` is already configured correctly.
 
