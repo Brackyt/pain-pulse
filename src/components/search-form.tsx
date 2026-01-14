@@ -108,7 +108,7 @@ export function SearchForm() {
                 <p className="mt-4 text-center text-red-400 text-sm">{error}</p>
             )}
 
-            <div className="mt-6 flex flex-wrap justify-center gap-2">
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
                 <span className="text-white/30 text-sm mr-1">Try:</span>
                 {EXAMPLE_KEYWORDS.map((keyword) => (
                     <button
