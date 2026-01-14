@@ -70,6 +70,13 @@ async function fetchRedditPage(
             },
         });
 
+        if (response.status === 403 || response.status === 429) {
+            // Throw specific error for rate limiting
+            const error = new Error("REDDIT_RATE_LIMITED");
+            (error as any).status = response.status;
+            throw error;
+        }
+
         if (!response.ok) {
             console.error(`Reddit API error: ${response.status}`);
             return [];
@@ -91,6 +98,10 @@ async function fetchRedditPage(
             isSelf: post.data.is_self,
         }));
     } catch (error) {
+        // Re-throw rate limit errors
+        if (error instanceof Error && error.message === "REDDIT_RATE_LIMITED") {
+            throw error;
+        }
         console.error("Failed to fetch Reddit page:", error);
         return [];
     }

@@ -154,8 +154,14 @@ export async function POST(request: NextRequest) {
         console.log(`Generating Intent-First report for: ${query}`);
 
         // 1. COLLECT: Fetch data using Intent Templates
+        let redditRateLimited = false;
         const [redditPosts, hnData] = await Promise.all([
             fetchRedditPosts(query).catch((e) => {
+                if (e instanceof Error && e.message === "REDDIT_RATE_LIMITED") {
+                    console.warn("Reddit rate limited");
+                    redditRateLimited = true;
+                    return [] as RawPost[];
+                }
                 console.error("Reddit fetch failed:", e);
                 return [] as RawPost[];
             }),
@@ -169,6 +175,12 @@ export async function POST(request: NextRequest) {
         const allPostsRaw = [...redditPosts, ...hnData.monthly];
 
         if (allPostsRaw.length === 0) {
+            if (redditRateLimited) {
+                return NextResponse.json(
+                    { error: "Reddit is temporarily limiting requests. Please try again in a few minutes." },
+                    { status: 503 }
+                );
+            }
             return NextResponse.json(
                 { error: "No results found for this query. Try a different keyword." },
                 { status: 404 }
