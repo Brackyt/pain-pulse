@@ -152,11 +152,7 @@ export async function fetchDevToPosts(query: string): Promise<RawPost[]> {
     return deduped;
 }
 
-export interface DevToTagBreakdown {
-    tag: string;
-    url: string;
-    count: number;
-}
+
 
 /**
  * Get top tags from the posts

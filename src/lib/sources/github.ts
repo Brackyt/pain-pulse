@@ -178,11 +178,7 @@ export async function fetchGitHubPosts(query: string): Promise<RawPost[]> {
     return deduped;
 }
 
-export interface GitHubRepoBreakdown {
-    name: string;
-    url: string;
-    count: number;
-}
+
 
 /**
  * Get top repositories from the posts
