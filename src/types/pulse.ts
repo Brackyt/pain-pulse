@@ -32,6 +32,13 @@ export interface BuildIdea {
 export interface SourceBreakdown {
     reddit: SubredditBreakdown[];
     hackernews: HNThreadBreakdown[];
+    github: GitHubRepoBreakdown[];
+}
+
+export interface GitHubRepoBreakdown {
+    name: string;
+    url: string;
+    count: number;
 }
 
 export interface SubredditBreakdown {
