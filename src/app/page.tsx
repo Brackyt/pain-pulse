@@ -94,7 +94,7 @@ export default function Home() {
       <section className="relative px-6 py-24">
         <div className="max-w-5xl mx-auto">
           <h2 className="text-2xl md:text-3xl font-bold text-white text-center mb-4">
-            What you'll discover
+            What you&apos;ll discover
           </h2>
           <p className="text-white/40 text-center mb-16 max-w-lg mx-auto">
             Turn internet complaints into actionable market insights

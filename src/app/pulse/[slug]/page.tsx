@@ -32,7 +32,7 @@ const getReport = cache(async (slug: string): Promise<PulseReport | null> => {
         const data = doc.data() as PulseReportFirestore;
 
         // Validating date function safely
-        const toDate = (val: any) => {
+        const toDate = (val: number | { toDate?: () => Date }): Date => {
             if (typeof val === 'number') return new Date(val);
             if (val && typeof val.toDate === 'function') return val.toDate();
             return new Date();

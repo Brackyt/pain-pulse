@@ -38,7 +38,7 @@ const BUCKETS = [
  * Assign posts to buckets and generate Themes
  * Now includes per-bucket phrases and high-quality quotes ("receipts")
  */
-export async function bucketPosts(posts: RawPost[], query: string): Promise<Theme[]> {
+export async function bucketPosts(posts: RawPost[]): Promise<Theme[]> {
     const bucketMap = new Map<string, RawPost[]>();
 
     // Initialize buckets

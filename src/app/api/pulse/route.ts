@@ -224,7 +224,7 @@ export async function POST(request: NextRequest) {
 
         // Buckets: Static Intent Buckets (Alternatives, Pricing, etc.)
         // This now handles phrase extraction per-bucket
-        const themes = await bucketPosts(allPosts, query);
+        const themes = await bucketPosts(allPosts);
 
         // Top Phrases: Aggregate from themes or keep simple global extraction?
         // Let's keep a global list for the UI sidebar, but make sure it uses the new logic

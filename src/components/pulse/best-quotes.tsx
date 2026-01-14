@@ -43,7 +43,7 @@ export function BestQuotes({ quotes }: BestQuotesProps) {
                         className="group relative pull-quote p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:border-orange-500/20 hover:bg-orange-500/[0.02] transition-all duration-200"
                     >
                         <p className="text-white/70 text-sm leading-relaxed not-italic pr-10">
-                            "{quote}"
+                            &ldquo;{quote}&rdquo;
                         </p>
                         <button
                             onClick={() => handleCopy(quote, index)}

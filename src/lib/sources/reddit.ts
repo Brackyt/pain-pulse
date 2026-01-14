@@ -73,7 +73,6 @@ async function fetchRedditPage(
         if (response.status === 403 || response.status === 429) {
             // Throw specific error for rate limiting
             const error = new Error("REDDIT_RATE_LIMITED");
-            (error as any).status = response.status;
             throw error;
         }
 
@@ -184,11 +183,15 @@ async function fetchPostComments(postId: string): Promise<string[]> {
         // Reddit returns array: [postListing, commentListing]
         if (!Array.isArray(data) || data.length < 2) return [];
 
-        const comments = data[1].data?.children || [];
+        interface RedditComment {
+            kind: string;
+            data?: { body?: string };
+        }
+        const comments: RedditComment[] = data[1].data?.children || [];
 
         return comments
-            .filter((c: any) => c.kind === "t1" && c.data?.body)
-            .map((c: any) => c.data.body);
+            .filter((c) => c.kind === "t1" && c.data?.body)
+            .map((c) => c.data!.body!);
 
     } catch (error) {
         console.error(`Failed to fetch comments for ${postId}:`, error);

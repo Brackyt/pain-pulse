@@ -100,8 +100,7 @@ export function calculatePainIndex(posts: RawPost[]): number {
  * opportunity = weight * sigmoid(pain) * sigmoid(intent)
  */
 export function calculateOpportunityScore(
-    posts: RawPost[],
-    painIndex: number
+    posts: RawPost[]
 ): number {
     if (posts.length === 0) return 0;
 
@@ -184,7 +183,7 @@ export function calculatePainSpikesFromCounts(
  */
 export function calculateStats(posts: RawPost[]): PulseStats {
     const painIndex = calculatePainIndex(posts);
-    const opportunityScore = calculateOpportunityScore(posts, painIndex);
+    const opportunityScore = calculateOpportunityScore(posts);
     const volume = posts.length;
 
     return {

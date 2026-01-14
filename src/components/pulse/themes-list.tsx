@@ -54,7 +54,7 @@ export function ThemesList({ themes }: ThemesListProps) {
                                         key={i}
                                         className="pull-quote text-sm text-white/50 py-1 not-italic"
                                     >
-                                        "{quote}"
+                                        &ldquo;{quote}&rdquo;
                                     </p>
                                 ))}
                             </div>

@@ -57,7 +57,7 @@ export function QuotesSection({ phrases }: QuotesSectionProps) {
                             {phrase.count}×
                         </span>
                         <span className="flex-1 text-white/70 text-sm truncate">
-                            "{phrase.phrase}"
+                            &ldquo;{phrase.phrase}&rdquo;
                         </span>
                         <button
                             onClick={() => handleCopy(phrase.phrase, index)}

@@ -28,16 +28,6 @@ export function PulseIcon({ className, size = 24 }: IconProps) {
     );
 }
 
-// Animated pulse ring for logo
-export function PulseRing({ className }: IconProps) {
-    return (
-        <div className={cn("relative", className)}>
-            <div className="absolute inset-0 rounded-full bg-red-500/20 animate-ping" />
-            <div className="absolute inset-0 rounded-full bg-red-500/10 animate-pulse" />
-        </div>
-    );
-}
-
 // Fire/Flame icon for friction/pain
 export function FlameIcon({ className, size = 24 }: IconProps) {
     return (
@@ -64,35 +54,6 @@ export function FlameIcon({ className, size = 24 }: IconProps) {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 fill="none"
-            />
-        </svg>
-    );
-}
-
-// Lightbulb icon for ideas
-export function LightbulbIcon({ className, size = 24 }: IconProps) {
-    return (
-        <svg
-            width={size}
-            height={size}
-            viewBox="0 0 24 24"
-            fill="none"
-            className={cn("", className)}
-        >
-            <path
-                d="M9 21h6M12 3a6 6 0 0 0-3.87 10.59c.62.63 1.37 1.41 1.37 2.91v.5h5v-.5c0-1.5.75-2.28 1.37-2.91A6 6 0 0 0 12 3z"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
-            <path
-                d="M12 3v1M4.22 10H3M5.64 5.64l-.71-.71M18.36 5.64l.71-.71M21 10h-1.22"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                opacity="0.5"
             />
         </svg>
     );

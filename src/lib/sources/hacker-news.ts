@@ -173,14 +173,6 @@ export async function fetchHNPosts(query: string): Promise<{
 }
 
 /**
- * Get combined HN posts (for backwards compatibility)
- */
-export async function fetchHNPostsCombined(query: string): Promise<RawPost[]> {
-    const { monthly } = await fetchHNPosts(query);
-    return monthly;
-}
-
-/**
  * Get top HN threads breakdown
  */
 export function getHNBreakdown(

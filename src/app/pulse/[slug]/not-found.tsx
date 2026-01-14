@@ -7,7 +7,7 @@ export default function NotFound() {
                 <div className="text-6xl mb-6">🔍</div>
                 <h1 className="text-4xl font-bold text-white mb-4">Report Not Found</h1>
                 <p className="text-lg text-white/50 mb-8">
-                    This pain report doesn't exist yet. Generate a new one!
+                    This pain report doesn&apos;t exist yet. Generate a new one!
                 </p>
                 <Link
                     href="/"

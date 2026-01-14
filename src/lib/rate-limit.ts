@@ -85,9 +85,8 @@ import { NextRequest } from "next/server";
  */
 export function getClientIP(request: Request | NextRequest): string {
     // 1. Try Next.js built-in IP (works on Vercel, etc.)
-    const req = request as any;
-    if (req.ip) {
-        return req.ip;
+    if ('ip' in request && typeof request.ip === 'string') {
+        return request.ip;
     }
 
     // 2. Check headers

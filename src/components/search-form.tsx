@@ -42,7 +42,7 @@ export function SearchForm() {
             }
 
             router.push(`/pulse/${data.slug}`);
-        } catch (err) {
+        } catch {
             setError("Something went wrong. Please try again.");
             setLoading(false);
         }
