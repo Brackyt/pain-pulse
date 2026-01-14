@@ -6,7 +6,7 @@ export default function Home() {
   return (
     <div className="pulse-gradient-bg pulse-pattern min-h-screen">
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4">
+      <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4 glass border-b border-white/5">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3 text-white group">
             <div className="relative">
