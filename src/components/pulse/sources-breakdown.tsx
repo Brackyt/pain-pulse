@@ -8,8 +8,9 @@ export function SourcesBreakdown({ breakdown }: SourcesBreakdownProps) {
     const hasReddit = breakdown.reddit.length > 0;
     const hasHN = breakdown.hackernews.length > 0;
     const hasGitHub = breakdown.github && breakdown.github.length > 0;
+    const hasDevTo = breakdown.devto && breakdown.devto.length > 0;
 
-    if (!hasReddit && !hasHN && !hasGitHub) {
+    if (!hasReddit && !hasHN && !hasGitHub && !hasDevTo) {
         return null;
     }
 
@@ -107,6 +108,36 @@ export function SourcesBreakdown({ breakdown }: SourcesBreakdownProps) {
                                         {repo.name}
                                     </a>
                                     <span className="text-white/30 tabular-nums">{repo.count}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Dev.to */}
+                {hasDevTo && (
+                    <div>
+                        <div className="flex items-center gap-2 mb-4">
+                            <svg className="w-4 h-4 text-gray-100" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M7.42 10.05c-.18-.16-.46-.23-.84-.23H6v4.36h.58c.37 0 .65-.08.84-.23.18-.16.27-.48.27-.97v-1.92c0-.49-.09-.82-.27-.98zm-3.5 0c-.18-.16-.46-.23-.84-.23H2.5v4.36h.58c.37 0 .65-.08.84-.23.18-.16.27-.48.27-.97v-1.92c0-.49-.09-.82-.27-.98zM24 2.5v19c0 1.38-1.12 2.5-2.5 2.5h-19C1.12 24 0 22.88 0 21.5v-19C0 1.12 1.12 0 2.5 0h19C22.88 0 24 1.12 24 2.5zM8.56 15.8c.48-.55.72-1.37.72-2.45v-2.5c0-1.04-.24-1.83-.72-2.38-.48-.54-1.16-.81-2.04-.81H4.28v11.45h2.24c.88 0 1.56-.27 2.04-.81zm6.42-6.24c0-.58-.36-1.02-.86-1.02H11.8v8.08h2.26c.52 0 .86-.37.86-.88v-3.06h-1.68v-.96h1.68V9.56h.06zm7.5-.56h-1.14c-.57 0-1.04.2-1.39.58-.18.2-.31.44-.39.72-.08.28-.12.69-.12 1.22v1.2c0 1.44.52 2.42 1.56 2.94l-.04.02c.24.1.49.15.76.15h1.04v-.86h-.72c-.52 0-.84-.08-1-.25-.16-.16-.24-.45-.24-.86v-1.8h2.24V9.9h-2.24v-1.1h-1.08v1.1h-1.08v.86h1.08v2.76c0 .63.18 1.12.54 1.47.36.35.88.53 1.56.53h2.08v-6.1h-1.42v-.06z" />
+                            </svg>
+                            <h4 className="text-sm font-medium text-gray-200">Top Tags</h4>
+                        </div>
+                        <div className="space-y-2">
+                            {breakdown.devto.slice(0, 5).map((item) => (
+                                <div
+                                    key={item.tag}
+                                    className="flex items-center justify-between text-sm p-2 rounded-lg hover:bg-white/[0.02] transition-colors"
+                                >
+                                    <a
+                                        href={item.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-white/60 hover:text-white hover:underline underline-offset-2"
+                                    >
+                                        #{item.tag}
+                                    </a>
+                                    <span className="text-white/30 tabular-nums">{item.count}</span>
                                 </div>
                             ))}
                         </div>

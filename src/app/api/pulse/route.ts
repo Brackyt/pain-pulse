@@ -5,6 +5,7 @@ import { checkRateLimit, getClientIP } from "@/lib/rate-limit";
 import { fetchRedditPosts, getSubredditBreakdown } from "@/lib/sources/reddit";
 import { fetchHNPosts, getHNBreakdown } from "@/lib/sources/hacker-news";
 import { fetchGitHubPosts, getGitHubBreakdown } from "@/lib/sources/github";
+import { fetchDevToPosts, getDevToBreakdown } from "@/lib/sources/devto";
 import { calculateStats, calculatePainSpikesFromCounts } from "@/lib/analysis/scoring";
 import { bucketPosts } from "@/lib/analysis/bucketing";
 import { generateBuildIdeas } from "@/lib/analysis/ideas";
@@ -156,7 +157,7 @@ export async function POST(request: NextRequest) {
 
         // 1. COLLECT: Fetch data using Intent Templates
         let redditRateLimited = false;
-        const [redditPosts, hnData, githubData] = await Promise.all([
+        const [redditPosts, hnData, githubData, devtoData] = await Promise.all([
             fetchRedditPosts(query).catch((e) => {
                 if (e instanceof Error && e.message === "REDDIT_RATE_LIMITED") {
                     console.warn("Reddit rate limited");
@@ -174,11 +175,14 @@ export async function POST(request: NextRequest) {
                 console.error("GitHub fetch failed:", e);
                 return [] as RawPost[];
             }),
+            fetchDevToPosts(query).catch((e) => {
+                console.error("Dev.to fetch failed:", e);
+                return [] as RawPost[];
+            }),
         ]);
 
-        // Combine all posts for analysis (use monthly for full dataset)
-        // Add GitHub posts to the mix
-        const allPostsRaw = [...redditPosts, ...hnData.monthly, ...githubData];
+        // Combine all posts for analysis
+        const allPostsRaw = [...redditPosts, ...hnData.monthly, ...githubData, ...devtoData];
 
         if (allPostsRaw.length === 0) {
             if (redditRateLimited) {
@@ -235,6 +239,7 @@ export async function POST(request: NextRequest) {
             reddit: getSubredditBreakdown(allPosts.filter(p => p.source === 'reddit')),
             hackernews: getHNBreakdown(hnData.monthly),
             github: getGitHubBreakdown(allPosts.filter(p => p.source === 'github')),
+            devto: getDevToBreakdown(allPosts.filter(p => p.source === 'devto')),
         };
 
         // Pain Extraction (The Pivot)

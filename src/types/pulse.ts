@@ -20,7 +20,7 @@ export interface Theme {
 export interface SourceLink {
     title: string;
     url: string;
-    source: "reddit" | "hackernews" | "github" | "stackoverflow";
+    source: "reddit" | "hackernews" | "github" | "devto" | "stackoverflow";
 }
 
 export interface BuildIdea {
@@ -33,6 +33,13 @@ export interface SourceBreakdown {
     reddit: SubredditBreakdown[];
     hackernews: HNThreadBreakdown[];
     github: GitHubRepoBreakdown[];
+    devto: DevToTagBreakdown[];
+}
+
+export interface DevToTagBreakdown {
+    tag: string;
+    url: string;
+    count: number;
 }
 
 export interface GitHubRepoBreakdown {
@@ -80,7 +87,7 @@ export interface RawPost {
     title: string;
     body: string;
     url: string;
-    source: "reddit" | "hackernews" | "github" | "stackoverflow";
+    source: "reddit" | "hackernews" | "github" | "devto" | "stackoverflow";
     score: number;
     comments: number;
     createdAt: Date;
