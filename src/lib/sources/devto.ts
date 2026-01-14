@@ -1,4 +1,5 @@
 import { RawPost } from "@/types/pulse";
+import { registerSource, BreakdownItem, deduplicatePosts } from "./registry";
 
 interface DevToArticle {
     id: number;
@@ -17,10 +18,8 @@ interface DevToArticle {
 
 /**
  * Fetch a single Dev.to search query
- * Uses `tag` parameter with comma-separated values
  */
 async function fetchDevToSearch(tags: string[]): Promise<RawPost[]> {
-    // Dev.to API: tags parameter accepts comma-separated single-word tags
     const sanitizedTags = tags
         .map(t => t.toLowerCase().replace(/[^a-z0-9]/g, ''))
         .filter(t => t.length > 2);
@@ -72,47 +71,9 @@ async function fetchDevToSearch(tags: string[]): Promise<RawPost[]> {
 }
 
 /**
- * Generate dedupe signature for a post
- */
-function getDedupeSignature(post: RawPost): string {
-    const normalized = post.title
-        .toLowerCase()
-        .replace(/[^a-z0-9\s]/g, "")
-        .replace(/\s+/g, " ")
-        .trim()
-        .slice(0, 80);
-    return normalized;
-}
-
-/**
- * Deduplicate posts, keeping the one with highest engagement
- */
-function deduplicatePosts(posts: RawPost[]): RawPost[] {
-    const signatureMap = new Map<string, RawPost>();
-
-    for (const post of posts) {
-        const sig = getDedupeSignature(post);
-        const existing = signatureMap.get(sig);
-
-        if (!existing) {
-            signatureMap.set(sig, post);
-        } else {
-            const existingScore = existing.score + existing.comments * 2;
-            const newScore = post.score + post.comments * 2;
-            if (newScore > existingScore) {
-                signatureMap.set(sig, post);
-            }
-        }
-    }
-
-    return Array.from(signatureMap.values());
-}
-
-/**
  * Fetch Dev.to articles using query words as tags
  */
 export async function fetchDevToPosts(query: string): Promise<RawPost[]> {
-    // Split query into words to use as tags
     const words = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
 
     if (words.length === 0) {
@@ -142,26 +103,18 @@ export async function fetchDevToPosts(query: string): Promise<RawPost[]> {
         return true;
     });
 
-    // Deduplicate
+    // Deduplicate using shared utility
     const deduped = deduplicatePosts(filtered);
 
     console.log(`Dev.to: Raw ${allPosts.length} → Filtered ${filtered.length} → Deduped ${deduped.length}`);
 
-
-
     return deduped;
-}
-
-export interface DevToTagBreakdown {
-    tag: string;
-    url: string;
-    count: number;
 }
 
 /**
  * Get top tags from the posts
  */
-export function getDevToBreakdown(posts: RawPost[]): DevToTagBreakdown[] {
+export function getDevToBreakdown(posts: RawPost[]): BreakdownItem[] {
     const tagCounts = new Map<string, number>();
 
     posts.forEach(post => {
@@ -172,11 +125,26 @@ export function getDevToBreakdown(posts: RawPost[]): DevToTagBreakdown[] {
     });
 
     return Array.from(tagCounts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
         .map(([tag, count]) => ({
-            tag,
+            label: `#${tag}`,
             url: `https://dev.to/t/${tag}`,
             count
-        }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 5);
+        }));
 }
+
+// Self-register with the source registry
+registerSource({
+    id: "devto",
+    name: "Dev.to",
+    color: "text-gray-200",
+    icon: {
+        type: "svg",
+        content: "M7.42 10.05c-.18-.16-.46-.23-.84-.23H6v4.36h.58c.37 0 .65-.08.84-.23.18-.16.27-.48.27-.97v-1.92c0-.49-.09-.82-.27-.98zm-3.5 0c-.18-.16-.46-.23-.84-.23H2.5v4.36h.58c.37 0 .65-.08.84-.23.18-.16.27-.48.27-.97v-1.92c0-.49-.09-.82-.27-.98zM24 2.5v19c0 1.38-1.12 2.5-2.5 2.5h-19C1.12 24 0 22.88 0 21.5v-19C0 1.12 1.12 0 2.5 0h19C22.88 0 24 1.12 24 2.5zM8.56 15.8c.48-.55.72-1.37.72-2.45v-2.5c0-1.04-.24-1.83-.72-2.38-.48-.54-1.16-.81-2.04-.81H4.28v11.45h2.24c.88 0 1.56-.27 2.04-.81zm6.42-6.24c0-.58-.36-1.02-.86-1.02H11.8v8.08h2.26c.52 0 .86-.37.86-.88v-3.06h-1.68v-.96h1.68V9.56h.06zm7.5-.56h-1.14c-.57 0-1.04.2-1.39.58-.18.2-.31.44-.39.72-.08.28-.12.69-.12 1.22v1.2c0 1.44.52 2.42 1.56 2.94l-.04.02c.24.1.49.15.76.15h1.04v-.86h-.72c-.52 0-.84-.08-1-.25-.16-.16-.24-.45-.24-.86v-1.8h2.24V9.9h-2.24v-1.1h-1.08v1.1h-1.08v.86h1.08v2.76c0 .63.18 1.12.54 1.47.36.35.88.53 1.56.53h2.08v-6.1h-1.42v-.06z",
+        className: "w-4 h-4 text-gray-100",
+    },
+    fetch: fetchDevToPosts,
+    getBreakdown: (posts) => getDevToBreakdown(posts.filter(p => p.source === 'devto')),
+    breakdownTitle: "Top Tags",
+});

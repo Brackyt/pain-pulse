@@ -20,7 +20,7 @@ export interface Theme {
 export interface SourceLink {
     title: string;
     url: string;
-    source: "reddit" | "hackernews" | "github" | "devto" | "stackoverflow";
+    source: string; // Dynamic source ID
 }
 
 export interface BuildIdea {
@@ -29,35 +29,12 @@ export interface BuildIdea {
     targetUser: string;
 }
 
-export interface SourceBreakdown {
-    reddit: SubredditBreakdown[];
-    hackernews: HNThreadBreakdown[];
-    github: GitHubRepoBreakdown[];
-    devto: DevToTagBreakdown[];
-}
+// Re-export BreakdownItem from registry for convenience
+export type { BreakdownItem } from "@/lib/sources/registry";
 
-export interface DevToTagBreakdown {
-    tag: string;
-    url: string;
-    count: number;
-}
-
-export interface GitHubRepoBreakdown {
-    name: string;
-    url: string;
-    count: number;
-}
-
-export interface SubredditBreakdown {
-    subreddit: string;
-    count: number;
-}
-
-export interface HNThreadBreakdown {
-    title: string;
-    url: string;
-    points: number;
-}
+// Dynamic source breakdown - keys are source IDs
+import type { BreakdownItem } from "@/lib/sources/registry";
+export type SourceBreakdown = Record<string, BreakdownItem[]>;
 
 export interface PulseStats {
     painIndex: number; // 0-100
