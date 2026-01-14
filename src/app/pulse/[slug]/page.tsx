@@ -18,7 +18,9 @@ interface PageProps {
     params: Promise<{ slug: string }>;
 }
 
-async function getReport(slug: string): Promise<PulseReport | null> {
+import { cache } from 'react';
+
+const getReport = cache(async (slug: string): Promise<PulseReport | null> => {
     try {
         const docRef = db.collection("pulses").doc(slug);
         const doc = await docRef.get();
@@ -45,7 +47,7 @@ async function getReport(slug: string): Promise<PulseReport | null> {
         console.error("Failed to fetch report:", error);
         return null;
     }
-}
+});
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
     const { slug } = await params;
