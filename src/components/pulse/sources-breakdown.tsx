@@ -3,6 +3,20 @@
 import { SourceBreakdown, BreakdownItem } from "@/types/pulse";
 import { getSourceById, SourceIcon } from "@/lib/sources";
 
+// Sanitize URL to prevent XSS (only allow http/https)
+function sanitizeUrl(url: string): string {
+    if (!url) return "";
+    try {
+        const parsed = new URL(url);
+        if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+            return url;
+        }
+    } catch {
+        // Invalid URL, return empty
+    }
+    return "";
+}
+
 interface SourcesBreakdownProps {
     breakdown: SourceBreakdown;
 }
@@ -99,7 +113,7 @@ function SourceSection({ sourceId, items }: { sourceId: string; items: Breakdown
                             className="flex items-center justify-between text-sm p-2 rounded-lg hover:bg-white/[0.02] transition-colors"
                         >
                             <a
-                                href={item.url}
+                                href={sanitizeUrl(item.url)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-white/60 hover:text-white hover:underline underline-offset-2 line-clamp-1"
