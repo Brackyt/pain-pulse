@@ -57,7 +57,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         };
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://painpulse.app";
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://pain-pulse.web.app";
     const ogUrl = `${baseUrl}/api/og?slug=${slug}&query=${encodeURIComponent(report.query)}&pain=${report.stats.painIndex}&opportunity=${report.stats.opportunityScore}&volume=${report.stats.volume}`;
 
     return {
@@ -66,7 +66,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         openGraph: {
             title: `${report.query} - Pain Report | Pain Pulse`,
             description: `Pain Index: ${report.stats.painIndex}/100 | Opportunity Score: ${report.stats.opportunityScore}/100`,
-            images: [ogUrl],
+            images: [
+                {
+                    url: ogUrl,
+                    width: 1200,
+                    height: 630,
+                    alt: `Pain Report for ${report.query}`,
+                },
+            ],
         },
         twitter: {
             card: "summary_large_image",
