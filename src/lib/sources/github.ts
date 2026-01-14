@@ -187,7 +187,13 @@ export interface GitHubRepoBreakdown {
 /**
  * Get top repositories from the posts
  */
-export function getGitHubBreakdown(posts: RawPost[]): GitHubRepoBreakdown[] {
+// Self-register with the source registry
+import { registerSource, BreakdownItem } from "./registry";
+
+/**
+ * Get top repositories from the posts
+ */
+export function getGitHubBreakdown(posts: RawPost[]): BreakdownItem[] {
     const repoCounts = new Map<string, number>();
 
     posts.forEach(post => {
@@ -198,24 +204,13 @@ export function getGitHubBreakdown(posts: RawPost[]): GitHubRepoBreakdown[] {
     });
 
     return Array.from(repoCounts.entries())
+        .sort((a, b) => b[1] - a[1]) // Sort by count descending
+        .slice(0, 5)
         .map(([name, count]) => ({
-            name,
+            label: name,
             url: `https://github.com/${name}`,
             count
-        }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 5);
-}
-
-// Self-register with the source registry
-import { registerSource, BreakdownItem } from "./registry";
-
-function getGitHubBreakdownForRegistry(posts: RawPost[]): BreakdownItem[] {
-    return getGitHubBreakdown(posts).map(item => ({
-        label: item.name,
-        url: item.url,
-        count: item.count,
-    }));
+        }));
 }
 
 registerSource({
@@ -224,6 +219,6 @@ registerSource({
     color: "gray-100",
     icon: null,
     fetch: fetchGitHubPosts,
-    getBreakdown: getGitHubBreakdownForRegistry,
+    getBreakdown: (posts) => getGitHubBreakdown(posts.filter(p => p.source === 'github')),
     breakdownTitle: "Top Repositories",
 });

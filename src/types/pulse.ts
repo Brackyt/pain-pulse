@@ -36,30 +36,6 @@ export type { BreakdownItem } from "@/lib/sources/registry";
 import type { BreakdownItem } from "@/lib/sources/registry";
 export type SourceBreakdown = Record<string, BreakdownItem[]>;
 
-// Legacy types (kept for backwards compatibility with existing data)
-export interface DevToTagBreakdown {
-    tag: string;
-    url: string;
-    count: number;
-}
-
-export interface GitHubRepoBreakdown {
-    name: string;
-    url: string;
-    count: number;
-}
-
-export interface SubredditBreakdown {
-    subreddit: string;
-    count: number;
-}
-
-export interface HNThreadBreakdown {
-    title: string;
-    url: string;
-    points: number;
-}
-
 export interface PulseStats {
     painIndex: number; // 0-100
     opportunityScore: number; // 0-100

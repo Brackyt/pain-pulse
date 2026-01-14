@@ -161,7 +161,13 @@ export interface DevToTagBreakdown {
 /**
  * Get top tags from the posts
  */
-export function getDevToBreakdown(posts: RawPost[]): DevToTagBreakdown[] {
+// Self-register with the source registry
+import { registerSource, BreakdownItem } from "./registry";
+
+/**
+ * Get top tags from the posts
+ */
+export function getDevToBreakdown(posts: RawPost[]): BreakdownItem[] {
     const tagCounts = new Map<string, number>();
 
     posts.forEach(post => {
@@ -172,24 +178,13 @@ export function getDevToBreakdown(posts: RawPost[]): DevToTagBreakdown[] {
     });
 
     return Array.from(tagCounts.entries())
+        .sort((a, b) => b[1] - a[1]) // Sort by count descending
+        .slice(0, 5)
         .map(([tag, count]) => ({
-            tag,
+            label: `#${tag}`,
             url: `https://dev.to/t/${tag}`,
             count
-        }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 5);
-}
-
-// Self-register with the source registry
-import { registerSource, BreakdownItem } from "./registry";
-
-function getDevToBreakdownForRegistry(posts: RawPost[]): BreakdownItem[] {
-    return getDevToBreakdown(posts).map(item => ({
-        label: `#${item.tag}`,
-        url: item.url,
-        count: item.count,
-    }));
+        }));
 }
 
 registerSource({
@@ -198,6 +193,6 @@ registerSource({
     color: "gray-100",
     icon: null,
     fetch: fetchDevToPosts,
-    getBreakdown: getDevToBreakdownForRegistry,
+    getBreakdown: (posts) => getDevToBreakdown(posts.filter(p => p.source === 'devto')),
     breakdownTitle: "Top Tags",
 });

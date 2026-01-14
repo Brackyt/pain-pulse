@@ -272,12 +272,13 @@ export async function fetchRedditPosts(query: string): Promise<RawPost[]> {
     return deduped;
 }
 
+// Self-register with the source registry
+import { registerSource, BreakdownItem } from "./registry";
+
 /**
  * Get subreddit breakdown from posts
  */
-export function getSubredditBreakdown(
-    posts: RawPost[]
-): { subreddit: string; count: number }[] {
+export function getSubredditBreakdown(posts: RawPost[]): BreakdownItem[] {
     const counts = new Map<string, number>();
 
     for (const post of posts) {
@@ -287,20 +288,13 @@ export function getSubredditBreakdown(
     }
 
     return Array.from(counts.entries())
-        .map(([subreddit, count]) => ({ subreddit, count }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 10);
-}
-
-// Self-register with the source registry
-import { registerSource, BreakdownItem } from "./registry";
-
-function getRedditBreakdown(posts: RawPost[]): BreakdownItem[] {
-    return getSubredditBreakdown(posts.filter(p => p.source === 'reddit')).map(item => ({
-        label: `r/${item.subreddit}`,
-        url: `https://reddit.com/r/${item.subreddit}`,
-        count: item.count,
-    }));
+        .sort((a, b) => b[1] - a[1]) // Sort by count descending
+        .slice(0, 10)
+        .map(([subreddit, count]) => ({
+            label: `r/${subreddit}`,
+            url: `https://reddit.com/r/${subreddit}`,
+            count
+        }));
 }
 
 registerSource({
@@ -309,6 +303,6 @@ registerSource({
     color: "orange-500",
     icon: null, // Will be set in UI component
     fetch: fetchRedditPosts,
-    getBreakdown: getRedditBreakdown,
+    getBreakdown: (posts) => getSubredditBreakdown(posts.filter(p => p.source === 'reddit')),
     breakdownTitle: "Top Subreddits",
 });

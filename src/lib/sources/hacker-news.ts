@@ -175,29 +175,22 @@ export async function fetchHNPosts(query: string): Promise<{
 /**
  * Get top HN threads breakdown
  */
-export function getHNBreakdown(
-    posts: RawPost[]
-): { title: string; url: string; points: number }[] {
+// Self-register with the source registry
+import { registerSource, BreakdownItem } from "./registry";
+
+/**
+ * Get top HN threads breakdown
+ */
+export function getHNBreakdown(posts: RawPost[]): BreakdownItem[] {
     return posts
         .filter((p) => p.source === "hackernews")
         .sort((a, b) => b.score - a.score)
         .slice(0, 10)
         .map((post) => ({
-            title: post.title,
+            label: post.title.length > 50 ? post.title.slice(0, 47) + "..." : post.title,
             url: post.url,
-            points: post.score,
+            count: post.score,
         }));
-}
-
-// Self-register with the source registry
-import { registerSource, BreakdownItem } from "./registry";
-
-function getHNBreakdownForRegistry(posts: RawPost[]): BreakdownItem[] {
-    return getHNBreakdown(posts).map(item => ({
-        label: item.title.length > 50 ? item.title.slice(0, 47) + "..." : item.title,
-        url: item.url,
-        count: item.points,
-    }));
 }
 
 // Wrapper to return flat array (HN has weekly/monthly structure)
@@ -212,6 +205,6 @@ registerSource({
     color: "orange-400",
     icon: null,
     fetch: fetchHNPostsFlat,
-    getBreakdown: getHNBreakdownForRegistry,
+    getBreakdown: getHNBreakdown,
     breakdownTitle: "Top Discussions",
 });
