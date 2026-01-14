@@ -1,13 +1,17 @@
-import { ImageResponse } from "@vercel/og";
+import { ImageResponse } from "next/og";
 import { NextRequest } from "next/server";
-import { db } from "@/lib/firebase-admin";
-import { PulseReportFirestore } from "@/types/pulse";
-
-export const runtime = "edge";
 
 export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const slug = searchParams.get("slug");
+
+    // Fetch Inter font from jsDelivr (reliable CDN)
+    const fontData = await fetch(
+        new URL('https://cdn.jsdelivr.net/npm/@fontsource/inter@5.0.8/files/inter-latin-700-normal.woff', import.meta.url)
+    ).then((res) => res.arrayBuffer()).catch(e => {
+        console.error("Font load failed", e);
+        return null;
+    });
 
     if (!slug) {
         return new Response("Missing slug parameter", { status: 400 });
@@ -33,7 +37,7 @@ export async function GET(request: NextRequest) {
                         alignItems: "center",
                         justifyContent: "center",
                         background: "linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%)",
-                        fontFamily: "system-ui, sans-serif",
+                        fontFamily: "Inter, sans-serif",
                     }}
                 >
                     {/* Background pattern */}
@@ -58,15 +62,24 @@ export async function GET(request: NextRequest) {
                             marginBottom: "32px",
                         }}
                     >
-                        <span
+                        <svg
+                            width="48"
+                            height="48"
+                            viewBox="0 0 24 24"
+                            fill="none"
                             style={{
-                                fontSize: "28px",
                                 color: "#ff6b6b",
-                                marginRight: "12px",
+                                marginRight: "16px",
                             }}
                         >
-                            🔥
-                        </span>
+                            <path
+                                d="M3 12h4l3-9 4 18 3-9h4"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            />
+                        </svg>
                         <span
                             style={{
                                 fontSize: "32px",
@@ -89,6 +102,7 @@ export async function GET(request: NextRequest) {
                             color: "transparent",
                             marginBottom: "48px",
                             textTransform: "capitalize",
+                            display: "flex",
                         }}
                     >
                         {query}
@@ -114,6 +128,7 @@ export async function GET(request: NextRequest) {
                                     fontSize: "72px",
                                     fontWeight: 800,
                                     color: "#ff6b6b",
+                                    display: "flex",
                                 }}
                             >
                                 {painIndex}
@@ -124,6 +139,7 @@ export async function GET(request: NextRequest) {
                                     color: "#94a3b8",
                                     textTransform: "uppercase",
                                     letterSpacing: "0.1em",
+                                    display: "flex",
                                 }}
                             >
                                 Pain Index
@@ -143,6 +159,7 @@ export async function GET(request: NextRequest) {
                                     fontSize: "72px",
                                     fontWeight: 800,
                                     color: "#4ade80",
+                                    display: "flex",
                                 }}
                             >
                                 {opportunityScore}
@@ -153,6 +170,7 @@ export async function GET(request: NextRequest) {
                                     color: "#94a3b8",
                                     textTransform: "uppercase",
                                     letterSpacing: "0.1em",
+                                    display: "flex",
                                 }}
                             >
                                 Opportunity
@@ -172,6 +190,7 @@ export async function GET(request: NextRequest) {
                                     fontSize: "72px",
                                     fontWeight: 800,
                                     color: "#38bdf8",
+                                    display: "flex",
                                 }}
                             >
                                 {volume}
@@ -182,6 +201,7 @@ export async function GET(request: NextRequest) {
                                     color: "#94a3b8",
                                     textTransform: "uppercase",
                                     letterSpacing: "0.1em",
+                                    display: "flex",
                                 }}
                             >
                                 Mentions
@@ -196,15 +216,24 @@ export async function GET(request: NextRequest) {
                             bottom: "32px",
                             fontSize: "18px",
                             color: "#64748b",
+                            display: "flex",
                         }}
                     >
-                        painpulse.app
+                        pain-pulse.web.app
                     </div>
                 </div>
             ),
             {
                 width: 1200,
                 height: 630,
+                fonts: fontData ? [
+                    {
+                        name: 'Inter',
+                        data: fontData,
+                        style: 'normal',
+                        weight: 700,
+                    },
+                ] : [],
             }
         );
     } catch (error) {
