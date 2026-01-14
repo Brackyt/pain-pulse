@@ -43,6 +43,11 @@ const DEFAULT_ICON: SourceIcon = {
 
 // Helper to handle legacy data structures from cached reports
 function normalizeItem(item: BreakdownItem, sourceId: string): BreakdownItem {
+    // Guard against null/undefined/malformed data
+    if (!item || typeof item !== 'object') {
+        return { label: "", url: "", count: 0 };
+    }
+
     const raw = item as any;
 
     // If it already has a label, it's the new format
