@@ -19,12 +19,12 @@ export default function Home() {
             <span className="text-xl font-bold tracking-tight">Pain Pulse</span>
           </Link>
           <a
-            href="https://github.com"
+            href="https://x.com/lebrackyt"
             target="_blank"
             rel="noopener noreferrer"
             className="text-white/50 hover:text-white text-sm transition-colors"
           >
-            Open Source
+            By Brackyt
           </a>
         </div>
       </nav>
