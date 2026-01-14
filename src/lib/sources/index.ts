@@ -4,6 +4,7 @@ import "./reddit";
 import "./hacker-news";
 import "./github";
 import "./devto";
+import "./serper";
 
 // Re-export registry functions
 export * from "./registry";

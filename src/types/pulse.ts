@@ -64,7 +64,7 @@ export interface RawPost {
     title: string;
     body: string;
     url: string;
-    source: "reddit" | "hackernews" | "github" | "devto" | "stackoverflow";
+    source: "reddit" | "hackernews" | "github" | "devto" | "stackoverflow" | "serper";
     score: number;
     comments: number;
     createdAt: Date;
