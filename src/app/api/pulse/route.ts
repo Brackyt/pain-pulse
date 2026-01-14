@@ -12,7 +12,7 @@ import { filterByRelevance } from "@/lib/analysis/relevance";
 import { PulseReport, PulseReportFirestore, RawPost } from "@/types/pulse";
 import { Timestamp } from "firebase-admin/firestore";
 
-const CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+const CACHE_DURATION_MS = 5 * 24 * 60 * 60 * 1000; // 5 days
 
 // Helper to safely convert Firestore timestamp or number to Date
 function toDate(val: Timestamp | number | Date): Date {

@@ -124,7 +124,7 @@ service cloud.firestore {
 ### Rate Limiting
 
 - 10 requests per minute per IP
-- 24-hour cache on reports
+- 5-day cache on reports
 
 ## Project Structure
 
