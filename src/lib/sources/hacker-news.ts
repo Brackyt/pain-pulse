@@ -1,6 +1,6 @@
 import { RawPost } from "@/types/pulse";
+import { registerSource, BreakdownItem, deduplicatePosts } from "./registry";
 
-// Intent-augmented query suffixes
 // Intent-based query templates
 const INTENT_QUERIES = [
     "best {K}",
@@ -63,43 +63,6 @@ async function fetchHNSearch(query: string, sinceTimestamp: number): Promise<Raw
 }
 
 /**
- * Generate dedupe signature for a post
- */
-function getDedupeSignature(post: RawPost): string {
-    const normalized = post.title
-        .toLowerCase()
-        .replace(/[^a-z0-9\s]/g, "")
-        .replace(/\s+/g, " ")
-        .trim()
-        .slice(0, 80);
-    return normalized;
-}
-
-/**
- * Deduplicate posts, keeping the one with highest engagement
- */
-function deduplicatePosts(posts: RawPost[]): RawPost[] {
-    const signatureMap = new Map<string, RawPost>();
-
-    for (const post of posts) {
-        const sig = getDedupeSignature(post);
-        const existing = signatureMap.get(sig);
-
-        if (!existing) {
-            signatureMap.set(sig, post);
-        } else {
-            const existingScore = existing.score + existing.comments * 2;
-            const newScore = post.score + post.comments * 2;
-            if (newScore > existingScore) {
-                signatureMap.set(sig, post);
-            }
-        }
-    }
-
-    return Array.from(signatureMap.values());
-}
-
-/**
  * Fetch posts from Hacker News for a specific time window
  */
 async function fetchHNForWindow(
@@ -138,13 +101,11 @@ async function fetchHNForWindow(
 
 /**
  * Fetch posts from Hacker News with separate weekly and monthly windows
- * Returns { weekly: posts from last 7d, monthly: posts from last 30d }
  */
 export async function fetchHNPosts(query: string): Promise<{
     weekly: RawPost[];
     monthly: RawPost[];
 }> {
-    // Fetch both time windows
     const [weeklyRaw, monthlyRaw] = await Promise.all([
         fetchHNForWindow(query, 7),
         fetchHNForWindow(query, 30),
@@ -161,7 +122,7 @@ export async function fetchHNPosts(query: string): Promise<{
     const weeklyFiltered = filterPosts(weeklyRaw);
     const monthlyFiltered = filterPosts(monthlyRaw);
 
-    // Deduplicate
+    // Deduplicate using shared utility
     const weekly = deduplicatePosts(weeklyFiltered);
     const monthly = deduplicatePosts(monthlyFiltered);
 
@@ -171,12 +132,6 @@ export async function fetchHNPosts(query: string): Promise<{
 
     return { weekly, monthly };
 }
-
-/**
- * Get top HN threads breakdown
- */
-// Self-register with the source registry
-import { registerSource, BreakdownItem } from "./registry";
 
 /**
  * Get top HN threads breakdown
@@ -193,17 +148,24 @@ export function getHNBreakdown(posts: RawPost[]): BreakdownItem[] {
         }));
 }
 
-// Wrapper to return flat array (HN has weekly/monthly structure)
+/**
+ * Wrapper to return flat array (HN has weekly/monthly structure)
+ */
 async function fetchHNPostsFlat(query: string): Promise<RawPost[]> {
     const { monthly } = await fetchHNPosts(query);
     return monthly;
 }
 
+// Self-register with the source registry
 registerSource({
     id: "hackernews",
     name: "Hacker News",
-    color: "orange-400",
-    icon: null,
+    color: "text-orange-400",
+    icon: {
+        type: "text",
+        content: "Y",
+        className: "w-4 h-4 bg-orange-500 text-white text-[10px] font-bold flex items-center justify-center rounded",
+    },
     fetch: fetchHNPostsFlat,
     getBreakdown: getHNBreakdown,
     breakdownTitle: "Top Discussions",

@@ -2,14 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/firebase-admin";
 import { queryToSlug, isValidSlug } from "@/lib/slug";
 import { checkRateLimit, getClientIP } from "@/lib/rate-limit";
-import { fetchRedditPosts } from "@/lib/sources/reddit";
-import { fetchHNPosts } from "@/lib/sources/hacker-news";
-import { getAllSources, BreakdownItem } from "@/lib/sources/registry";
-// Import sources to trigger self-registration
-import "@/lib/sources/reddit";
-import "@/lib/sources/hacker-news";
-import "@/lib/sources/github";
-import "@/lib/sources/devto";
+import { getAllSources, BreakdownItem } from "@/lib/sources";
 import { calculateStats, calculatePainSpikesFromCounts } from "@/lib/analysis/scoring";
 import { bucketPosts } from "@/lib/analysis/bucketing";
 import { generateBuildIdeas } from "@/lib/analysis/ideas";
