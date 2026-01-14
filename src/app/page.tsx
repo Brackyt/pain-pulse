@@ -58,8 +58,8 @@ export default function Home() {
             Discover what people are{" "}
             <span className="text-red-400/90">complaining about</span>,{" "}
             <span className="text-orange-400/90">asking for</span>, and{" "}
-            <span className="text-amber-400/90">struggling with</span> on Reddit &
-            Hacker News.
+            <span className="text-amber-400/90">struggling with</span> on Reddit,
+            Hacker News & GitHub Issues.
           </p>
 
           {/* Search Form */}

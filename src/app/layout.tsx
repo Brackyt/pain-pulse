@@ -15,19 +15,19 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Pain Pulse - Internet Frustration Barometer",
   description:
-    "Discover what people are complaining about on Reddit and Hacker News. Generate shareable market pain reports to find startup opportunities.",
-  keywords: ["market research", "startup ideas", "reddit", "hacker news", "pain points", "opportunities"],
+    "Discover what people are complaining about on Reddit, Hacker News & GitHub. Generate shareable market pain reports to find startup opportunities.",
+  keywords: ["market research", "startup ideas", "reddit", "hacker news", "github", "pain points", "opportunities"],
   openGraph: {
     title: "Pain Pulse - Internet Frustration Barometer",
     description:
-      "Discover what people are complaining about on Reddit and Hacker News. Generate shareable market pain reports.",
+      "Discover what people are complaining about on Reddit, Hacker News & GitHub. Generate shareable market pain reports.",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
     title: "Pain Pulse - Internet Frustration Barometer",
     description:
-      "Discover what people are complaining about on Reddit and Hacker News.",
+      "Discover what people are complaining about on Reddit, Hacker News & GitHub.",
   },
 };
 

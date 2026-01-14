@@ -1,6 +1,6 @@
 # 🔥 Pain Pulse
 
-**Internet Frustration Barometer** — Discover what people are complaining about, asking for, and struggling with on Reddit & Hacker News.
+**Internet Frustration Barometer** — Discover what people are complaining about, asking for, and struggling with on Reddit, Hacker News & GitHub Issues.
 
 ![Next.js](https://img.shields.io/badge/Next.js-16-black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)
@@ -8,7 +8,7 @@
 
 ## Features
 
-- 🔍 **Real-time analysis** of Reddit and Hacker News
+- 🔍 **Real-time analysis** of Reddit, Hacker News & GitHub Issues
 - 📊 **Pain Index** — Quantified frustration score (0-100)
 - 💡 **Opportunity Score** — Startup potential based on buyer intent
 - 📈 **Pain Spikes** — Week-over-week trend analysis
@@ -141,7 +141,7 @@ src/
 │   └── ui/                      # shadcn components
 ├── lib/
 │   ├── analysis/                # Scoring algorithms
-│   ├── sources/                 # Reddit & HN clients
+│   ├── sources/                 # Reddit, HN & GitHub clients
 │   ├── firebase-admin.ts        # Firestore client
 │   ├── rate-limit.ts            # Rate limiting
 │   └── slug.ts                  # URL utilities
