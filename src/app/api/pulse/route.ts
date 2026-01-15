@@ -7,7 +7,7 @@ import { calculateStats, calculatePainSpikesFromCounts } from "@/lib/analysis/sc
 import { bucketPosts } from "@/lib/analysis/bucketing";
 import { generateBuildIdeas } from "@/lib/analysis/ideas";
 import { extractTopPhrases, extractPainReceipts, extractPainPoints } from "@/lib/analysis/signals";
-import { filterByRelevance } from "@/lib/analysis/relevance";
+import { filterByRelevanceAsync } from "@/lib/analysis/relevance";
 import { PulseReport, PulseReportFirestore, RawPost } from "@/types/pulse";
 import { Timestamp } from "firebase-admin/firestore";
 
@@ -188,8 +188,8 @@ export async function POST(request: NextRequest) {
 
         console.log(`Raw posts: ${allPostsRaw.length}`);
 
-        // CRITICAL: Apply relevance filtering BEFORE any analysis
-        const allPosts = filterByRelevance(allPostsRaw, query, 3);
+        // CRITICAL: Apply semantic relevance filtering BEFORE any analysis
+        const allPosts = await filterByRelevanceAsync(allPostsRaw, query);
 
         if (allPosts.length < 5) {
             return NextResponse.json(
@@ -229,12 +229,12 @@ export async function POST(request: NextRequest) {
             sourceBreakdown[source.id] = source.getBreakdown(allPosts);
         }
 
-        // Pain Extraction (The Pivot)
+        // Pain Extraction (Semantic Pain Detection)
         // 1. Top Frictions: Short impactful pain statements
-        const frictions = extractPainPoints(allPosts, 5);
+        const frictions = await extractPainPoints(allPosts, 5);
 
         // 2. Pain Receipts: Longer "proof" quotes
-        const painReceipts = extractPainReceipts(allPosts, 6);
+        const painReceipts = await extractPainReceipts(allPosts, 6);
 
         // Generate build ideas based on themes
         const buildIdeas = generateBuildIdeas(themes, query);

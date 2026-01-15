@@ -1,4 +1,8 @@
 import { RawPost } from "@/types/pulse";
+import {
+    batchCalculateRelevance,
+    SEMANTIC_CONFIG,
+} from "./embeddings";
 
 /**
  * Gate 1: Global Spam Blacklist
@@ -18,77 +22,67 @@ const JUNK_BLACKLIST = [
     "megathread", "daily thread", "weekly thread", "monthly thread",
     "automod", "automoderator", "remind me", "upvote", "karma",
     "discord server", "telegram group", "dm me", "inbox me",
-    "hiring", "job offer", "salary", "interview", "resume", "cv review" // Added career noise
+    "hiring", "job offer", "salary", "interview", "resume", "cv review"
 ];
 
 /**
- * TOOLS MODE: Anchors
- * Post must contain at least one of these to be considered "about a tool".
+ * Check if a post matches the spam blacklist
  */
-const TOOL_ANCHORS = [
-    "tool", "tools", "app", "apps", "software", "platform", "service",
-    "solution", "dashboard", "api", "sdk", "library", "plugin", "extension",
-    "self-hosted", "open source", "open-source", "saas", "startup",
-    "alternative", "pricing", "cost", "vs", "comparison", "review",
-    "integration", "stack", "tech stack"
-];
-
-/**
- * TOOLS MODE: High Intent Patterns
- * Generic signals that user is looking for or evaluating a solution.
- */
-const HIGH_INTENT_PATTERNS = [
-    /alternative\s+to/i,
-    /looking\s+for/i,
-    /recommend/i,
-    /best\s+.*(tool|app|software|platform)/i,
-    /too\s+expensive/i,
-    /switch\s+from/i,
-    /replace/i,
-    /how\s+do\s+I/i,
-    /anyone\s+using/i,
-    /worth\s+it/i
-];
-
-/**
- * Check Keyword Dominance (Gate 2)
- * Returns true if query enters Title OR constitutes > 1.5% of body text
- */
-function checkDominance(text: string, title: string, query: string): boolean {
-    const queryLower = query.toLowerCase();
-
-    // 1. Title Hit (High confidence)
-    if (title.toLowerCase().includes(queryLower)) {
-        return true;
-    }
-
-    // 2. Density Check
-    const words = text.split(/\s+/);
-    if (words.length < 10) return false;
-
-    const queryWords = queryLower.split(/\s+/).filter(w => w.length > 2);
-    if (queryWords.length === 0) return false;
-
-    // Count occurrences of any significant query word
-    let hits = 0;
-    for (const word of words) {
-        if (queryWords.some(qw => word.includes(qw))) {
-            hits++;
-        }
-    }
-
-    const density = hits / words.length;
-    return density >= 0.015; // 1.5% density threshold
+function isSpam(post: RawPost): boolean {
+    const text = `${post.title} ${post.body}`.toLowerCase();
+    return JUNK_BLACKLIST.some(word => text.includes(word));
 }
 
 /**
- * Calculate relevance score using TOOLS MODE Logic
- *
+ * Filter posts by semantic relevance (async version using embeddings)
+ * 
  * Pipeline:
- * 1. Spam Check (Fail)
- * 2. Tool Anchor Check (Fail if no tool/intent signal)
- * 3. Keyword Dominance (Fail if incidental)
- * 4. Proximity Boost (Score)
+ * 1. Spam Blacklist Filter (fast, synchronous)
+ * 2. Semantic Similarity Filter (uses NLP embeddings)
+ */
+export async function filterByRelevanceAsync(
+    posts: RawPost[],
+    query: string,
+    threshold: number = SEMANTIC_CONFIG.SIMILARITY_THRESHOLD
+): Promise<RawPost[]> {
+    // Gate 1: Remove spam (fast pre-filter)
+    const nonSpamPosts = posts.filter(post => !isSpam(post));
+
+    if (nonSpamPosts.length === 0) {
+        console.log(`Relevance filter: ${posts.length} posts → 0 (all spam)`);
+        return [];
+    }
+
+    console.log(`Pre-filter: ${posts.length} posts → ${nonSpamPosts.length} non-spam`);
+
+    // Gate 2: Semantic similarity filter
+    const relevanceMap = await batchCalculateRelevance(query, nonSpamPosts);
+
+    const scored = nonSpamPosts.map(post => ({
+        post,
+        similarity: relevanceMap.get(post.id) || 0,
+    }));
+
+    const filtered = scored
+        .filter(item => item.similarity >= threshold)
+        .sort((a, b) => b.similarity - a.similarity)
+        .map(item => item.post);
+
+    console.log(
+        `Semantic filter: ${nonSpamPosts.length} posts → ${filtered.length} relevant (threshold: ${threshold.toFixed(2)})`
+    );
+
+    return filtered;
+}
+
+// ============================================
+// Legacy synchronous functions (for backward compatibility)
+// These can be removed once all callers are updated
+// ============================================
+
+/**
+ * @deprecated Use filterByRelevanceAsync instead
+ * Synchronous relevance check (keyword-based fallback)
  */
 export function calculateRelevanceScore(
     post: RawPost,
@@ -101,40 +95,30 @@ export function calculateRelevanceScore(
         return 0;
     }
 
-    // Gate 2: Tools Mode Anchor
-    // Must match a Tool Anchor OR a High Intent Pattern
-    const hasToolAnchor = TOOL_ANCHORS.some(a => text.includes(a));
-    const hasIntentPattern = HIGH_INTENT_PATTERNS.some(p => p.test(text));
-
-    if (!hasToolAnchor && !hasIntentPattern) {
-        return 0; // Not about a tool/solution
-    }
-
-    // Gate 3: Keyword Dominance
-    if (!checkDominance(text, post.title, query)) {
-        return 0; // Not about the query topic
-    }
-
-    let score = 10; // Base score for passing generic tool gate
-
-    // Bonus: Proximity of Intent
-    // If exact query is near an intent trigger, boost score
+    // Simple keyword presence check (legacy behavior)
     const queryLower = query.toLowerCase();
+    const queryWords = queryLower.split(/\s+/).filter(w => w.length > 2);
+
+    let score = 0;
+
+    // Title match is strong signal
     if (post.title.toLowerCase().includes(queryLower)) {
-        score += 5;
+        score += 15;
+    } else if (queryWords.some(w => post.title.toLowerCase().includes(w))) {
+        score += 10;
     }
 
-    // Simple proximity boost if "alternative" or "recommend" is near query
-    // This is less strict now because Gate 2 ensures we are in "Tools Land"
-    if (text.match(new RegExp(`(alternative|recommend|best).{0,50}${queryLower}`, 'i'))) {
-        score += 10;
+    // Body match
+    if (queryWords.some(w => text.includes(w))) {
+        score += 5;
     }
 
     return score;
 }
 
 /**
- * Filter posts by relevance score
+ * @deprecated Use filterByRelevanceAsync instead
+ * Synchronous filter (keyword-based fallback)
  */
 export function filterByRelevance(
     posts: RawPost[],
@@ -152,7 +136,7 @@ export function filterByRelevance(
         .map((item) => item.post);
 
     console.log(
-        `Relevance filter: ${posts.length} posts → ${filtered.length} relevant (min score: ${minScore})`
+        `Relevance filter (legacy): ${posts.length} posts → ${filtered.length} relevant (min score: ${minScore})`
     );
 
     return filtered;

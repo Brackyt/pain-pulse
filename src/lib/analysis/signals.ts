@@ -1,4 +1,5 @@
 import { RawPost, TopPhrase } from "@/types/pulse";
+import { batchScorePain, PAIN_CONFIG } from "./embeddings";
 
 // Stop words to filter out common noise
 const STOP_WORDS = new Set([
@@ -93,20 +94,8 @@ export function extractTopPhrases(posts: RawPost[], limit: number = 20): TopPhra
     return phrases;
 }
 
-// Triggers that explicitly signal PAIN, FRUSTRATION, or COST STRUGGLE
-const PAIN_TRIGGERS = [
-    "frustrating", "annoying", "painful", "headache", "nightmare", "fail", "failed",
-    "hate", "sucks", "broken", "unreliable", "buggy", "slow", "hard to", "difficult",
-    "confusing", "overkill", "too complex", "bloated",
-    "too expensive", "insane pricing", "costly", "afford", "cheaper", "ripoff",
-    "workaround", "manual", "spreadsheet", "excel", "hacky", "messy",
-    "abandoned", "gave up", "stopped using", "switched from", "left",
-    "stuck", "blocked", "limit", "limited", "restriction",
-    "scam", "waste of time", "garbage", "trash",
-    "nothing seems to", "don't understand why", "why is it so hard", "nothing fits"
-];
-
 // Triggers for specific CONSTRAINTS (context of struggle)
+// These are kept as keyword boosts since they're very specific
 const CONSTRAINT_TRIGGERS = [
     "for agencies", "small team", "at scale", "limitations", "for non-tech",
     "clunky", "bloat", "learning curve", "too many features", "not enough features",
@@ -121,168 +110,156 @@ function cleanQuote(text: string): string {
 }
 
 /**
- * Extract "Pain Receipts" (formerly Best Quotes)
- * 
- * Rules:
- * 1. Must contain a PAIN TRIGGER.
- * 2. Length 10-40 words.
- * 3. Shows PROOF of struggle (not just a question).
+ * Extract all candidate sentences from posts
  */
-export function extractPainReceipts(
-    posts: RawPost[],
-    limit: number = 6
-): string[] {
-    const scoredQuotes: { text: string; score: number }[] = [];
+function extractSentences(posts: RawPost[], minWords: number, maxWords: number): { text: string; engagementBoost: number }[] {
+    const sentences: { text: string; engagementBoost: number }[] = [];
     const uniqueTexts = new Set<string>();
 
-    // Process top 30 posts (deep scan for pain)
-    const topPosts = posts.slice(0, 30);
-
-    for (const post of topPosts) {
+    for (const post of posts) {
         const sourcesToCheck: string[] = [];
 
-        // 1. Post Body
         if (post.body) sourcesToCheck.push(post.body);
-
-        // 2. Post Title
         sourcesToCheck.push(post.title);
+        if (post.topComments) sourcesToCheck.push(...post.topComments);
 
-        // 3. Top Comments (NEW: Deep Pain)
-        if (post.topComments) {
-            sourcesToCheck.push(...post.topComments);
-        }
-
-        // iterate all sources (body, title, comments)
-        for (const sourceText of sourcesToCheck) {
-            // Split into rough sentences
-            const sentences = (sourceText || "")
-                .split(/[.!?]+/)
-                .map(s => cleanQuote(s))
-                .filter(s => s.length > 5); // Ignore tiny fragments
-
-            for (const sentence of sentences) {
-                const sLower = sentence.toLowerCase();
-
-                if (uniqueTexts.has(sLower)) continue;
-
-                const words = sentence.split(" ");
-                if (words.length < 8 || words.length > 45) continue;
-
-                let score = 0;
-                let hasPainTrigger = false;
-
-                for (const trigger of PAIN_TRIGGERS) {
-                    if (sLower.includes(trigger)) {
-                        score += 10;
-                        hasPainTrigger = true;
-                        // Boost intense pain words
-                        if (["hate", "nightmare", "failed", "expensive"].includes(trigger)) score += 5;
-                    }
-                }
-
-                if (!hasPainTrigger) continue;
-
-                // Boost if it sounds like a narrative "we tried..."
-                if (sLower.includes("we tried") || sLower.includes("i tried") || sLower.includes("ended up")) {
-                    score += 5;
-                }
-
-                // Boost constraints in longform too
-                if (CONSTRAINT_TRIGGERS.some(t => sLower.includes(t))) {
-                    score += 5;
-                }
-
-                scoredQuotes.push({ text: sentence, score });
-                uniqueTexts.add(sLower);
-            }
-        }
-    }
-
-    return scoredQuotes
-        .sort((a, b) => b.score - a.score)
-        .slice(0, limit)
-        .map(q => q.text);
-}
-
-/**
- * Extract "Top Frictions" (recurring pain themes)
- * Returns a list of SHORT pain/constraint statements.
- * Distinct from receipts: Focus is on "The Problem", not the "Story".
- * Ranked by Engagement (Post Score) + Match Quality.
- */
-export function extractPainPoints(posts: RawPost[], limit: number = 5): string[] {
-    const scoredFrictions: { text: string; score: number }[] = [];
-    const uniqueTexts = new Set<string>();
-
-    const topPosts = posts.slice(0, 50); // Scan deep
-
-    for (const post of topPosts) {
-        const sourcesToCheck: string[] = [];
-
-        // 1. Post Body
-        if (post.body) sourcesToCheck.push(post.body);
-
-        // 2. Post Title
-        sourcesToCheck.push(post.title);
-
-        // 3. Top Comments (NEW)
-        if (post.topComments) {
-            sourcesToCheck.push(...post.topComments);
-        }
-
-        // Engagement Factor: Logarithmic boost based on post score
-        // score 10 -> +1, score 100 -> +2, score 1000 -> +3
+        // Engagement boost based on post score
         const engagementBoost = Math.max(0, Math.log10(post.score || 1) * 2);
 
         for (const sourceText of sourcesToCheck) {
-            const sentences = (sourceText || "")
+            const rawSentences = (sourceText || "")
                 .split(/[.!?]+/)
                 .map(s => cleanQuote(s))
                 .filter(s => s.length > 5);
 
-            for (const sentence of sentences) {
+            for (const sentence of rawSentences) {
                 const sLower = sentence.toLowerCase();
-
-                // Dedupe fuzzy matches (contains)
-                if ([...uniqueTexts].some(ut => ut.includes(sLower) || sLower.includes(ut))) continue;
+                if (uniqueTexts.has(sLower)) continue;
 
                 const words = sentence.split(" ");
-                // Frictions should be punchy: 5-25 words
-                if (words.length < 5 || words.length > 25) continue;
+                if (words.length < minWords || words.length > maxWords) continue;
 
-                let score = 0;
-                let hasSignal = false;
-
-                // Constraint Check (Primary Signal for Frictions)
-                if (CONSTRAINT_TRIGGERS.some(t => sLower.includes(t))) {
-                    score += 10;
-                    hasSignal = true;
-                }
-
-                // Pain Trigger Check (Secondary but required if no constraint)
-                if (PAIN_TRIGGERS.some(t => sLower.includes(t))) {
-                    score += hasSignal ? 5 : 8; // Boost existing or base score
-                    hasSignal = true;
-                }
-
-                if (!hasSignal) continue;
-
-                // Narrative Boost (we tried, ended up)
-                if (sLower.includes("we tried") || sLower.includes("ended up")) score += 5;
-
-                // Apply Engagement Boost to the final score
-                score += engagementBoost;
-
-                scoredFrictions.push({ text: sentence, score });
+                sentences.push({ text: sentence, engagementBoost });
                 uniqueTexts.add(sLower);
             }
         }
     }
 
-    return scoredFrictions
-        .sort((a, b) => b.score - a.score)
-        .slice(0, limit)
-        .map(q => q.text);
+    return sentences;
 }
 
+/**
+ * Extract "Pain Receipts" using SEMANTIC pain detection
+ * 
+ * A sentence is a "pain receipt" if:
+ * 1. Semantically similar to pain archetypes (scored by embedding similarity)
+ * 2. Length 8-45 words (shows proof/narrative of struggle)
+ */
+export async function extractPainReceipts(
+    posts: RawPost[],
+    limit: number = 6
+): Promise<string[]> {
+    // Process top 30 posts for deep pain extraction
+    const topPosts = posts.slice(0, 30);
 
+    // Extract all candidate sentences (8-45 words for receipts - longer narratives)
+    const candidates = extractSentences(topPosts, 8, 45);
+
+    if (candidates.length === 0) return [];
+
+    // Batch score all sentences for pain using semantic similarity
+    const painScores = await batchScorePain(candidates.map(c => c.text));
+
+    // Score and rank
+    const scored = candidates
+        .map(c => {
+            const painScore = painScores.get(c.text) || 0;
+
+            // Skip if not painful enough
+            if (painScore < PAIN_CONFIG.PAIN_THRESHOLD) {
+                return null;
+            }
+
+            let score = painScore * 20; // Base score from pain similarity
+
+            // Boost for strong pain
+            if (painScore >= PAIN_CONFIG.STRONG_PAIN_THRESHOLD) {
+                score += 5;
+            }
+
+            // Boost narratives ("we tried", "ended up")
+            const sLower = c.text.toLowerCase();
+            if (sLower.includes("we tried") || sLower.includes("i tried") || sLower.includes("ended up")) {
+                score += 3;
+            }
+
+            // Boost constraints
+            if (CONSTRAINT_TRIGGERS.some(t => sLower.includes(t))) {
+                score += 2;
+            }
+
+            return { text: c.text, score };
+        })
+        .filter((item): item is { text: string; score: number } => item !== null)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit)
+        .map(item => item.text);
+
+    return scored;
+}
+
+/**
+ * Extract "Top Frictions" using SEMANTIC pain detection
+ * Short punchy pain statements (5-25 words)
+ * Ranked by engagement + pain intensity
+ */
+export async function extractPainPoints(
+    posts: RawPost[],
+    limit: number = 5
+): Promise<string[]> {
+    // Scan top 50 posts
+    const topPosts = posts.slice(0, 50);
+
+    // Extract candidate sentences (5-25 words for frictions - shorter/punchier)
+    const candidates = extractSentences(topPosts, 5, 25);
+
+    if (candidates.length === 0) return [];
+
+    // Batch score for pain
+    const painScores = await batchScorePain(candidates.map(c => c.text));
+
+    // Score and rank
+    const scored = candidates
+        .map(c => {
+            const painScore = painScores.get(c.text) || 0;
+
+            // Skip if not painful enough
+            if (painScore < PAIN_CONFIG.PAIN_THRESHOLD) {
+                return null;
+            }
+
+            let score = painScore * 15; // Base score from pain
+
+            // Add engagement boost
+            score += c.engagementBoost;
+
+            // Boost for strong pain
+            if (painScore >= PAIN_CONFIG.STRONG_PAIN_THRESHOLD) {
+                score += 5;
+            }
+
+            // Boost constraints (primary signal for frictions)
+            const sLower = c.text.toLowerCase();
+            if (CONSTRAINT_TRIGGERS.some(t => sLower.includes(t))) {
+                score += 3;
+            }
+
+            return { text: c.text, score };
+        })
+        .filter((item): item is { text: string; score: number } => item !== null)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit)
+        .map(item => item.text);
+
+    return scored;
+}
