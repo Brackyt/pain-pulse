@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 interface RadialGaugeProps {
     value: number;
@@ -98,7 +98,8 @@ export function RadialGauge({
 
     const percentage = animatedValue / maxValue;
     const strokeDashoffset = circumference * (1 - percentage);
-    const gradientId = `gauge-gradient-${type}-${Math.random().toString(36).substr(2, 9)}`;
+    const stableId = useId();
+    const gradientId = `gauge-gradient-${type}-${stableId}`;
 
     return (
         <div ref={ref} className={`relative inline-flex flex-col items-center ${className}`}>

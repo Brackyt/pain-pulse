@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 interface SparklineProps {
     data: number[];
@@ -31,8 +31,9 @@ export function Sparkline({
     const [animationProgress, setAnimationProgress] = useState(0);
     const ref = useRef<SVGSVGElement>(null);
 
-    // Generate unique ID for gradients
-    const gradientId = useRef(`sparkline-${Math.random().toString(36).substr(2, 9)}`);
+    // Generate unique ID for gradients (stable across server/client)
+    const stableId = useId();
+    const gradientId = `sparkline${stableId}`;
 
     useEffect(() => {
         const observer = new IntersectionObserver(
@@ -119,11 +120,11 @@ export function Sparkline({
         >
             {useGradient && (
                 <defs>
-                    <linearGradient id={`${gradientId.current}-line`} x1="0%" y1="0%" x2="100%" y2="0%">
+                    <linearGradient id={`${gradientId}-line`} x1="0%" y1="0%" x2="100%" y2="0%">
                         <stop offset="0%" stopColor={gradientFrom} />
                         <stop offset="100%" stopColor={gradientTo} />
                     </linearGradient>
-                    <linearGradient id={`${gradientId.current}-fill`} x1="0%" y1="0%" x2="0%" y2="100%">
+                    <linearGradient id={`${gradientId}-fill`} x1="0%" y1="0%" x2="0%" y2="100%">
                         <stop offset="0%" stopColor={gradientFrom} stopOpacity={0.3} />
                         <stop offset="100%" stopColor={gradientTo} stopOpacity={0} />
                     </linearGradient>
@@ -134,7 +135,7 @@ export function Sparkline({
             {filled && (
                 <path
                     d={areaD}
-                    fill={useGradient ? `url(#${gradientId.current}-fill)` : color}
+                    fill={useGradient ? `url(#${gradientId}-fill)` : color}
                     opacity={useGradient ? 1 : 0.15}
                 />
             )}
@@ -143,7 +144,7 @@ export function Sparkline({
             <path
                 d={pathD}
                 fill="none"
-                stroke={useGradient ? `url(#${gradientId.current}-line)` : color}
+                stroke={useGradient ? `url(#${gradientId}-line)` : color}
                 strokeWidth={strokeWidth}
                 strokeLinecap="round"
                 strokeLinejoin="round"
