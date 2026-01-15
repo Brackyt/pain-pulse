@@ -149,10 +149,53 @@ export function getHNBreakdown(posts: RawPost[]): BreakdownItem[] {
 }
 
 /**
+ * Fetch top comments for a specific HN story using Algolia API
+ */
+async function fetchHNComments(storyId: string): Promise<string[]> {
+    const url = `https://hn.algolia.com/api/v1/search?tags=comment,story_${storyId}&hitsPerPage=10`;
+
+    try {
+        const response = await fetch(url);
+        if (!response.ok) return [];
+
+        const data = await response.json();
+
+        interface HNComment {
+            comment_text: string | null;
+        }
+
+        return (data.hits as HNComment[])
+            .filter((hit) => hit.comment_text)
+            .map((hit) => hit.comment_text as string);
+    } catch (error) {
+        console.error(`Failed to fetch HN comments for story ${storyId}:`, error);
+        return [];
+    }
+}
+
+/**
  * Wrapper to return flat array (HN has weekly/monthly structure)
+ * Also enriches top posts with comments for deeper pain extraction
  */
 async function fetchHNPostsFlat(query: string): Promise<RawPost[]> {
     const { monthly } = await fetchHNPosts(query);
+
+    // Sort by engagement and take top 10 for deep scan
+    const sorted = [...monthly].sort(
+        (a, b) => (b.score + b.comments * 2) - (a.score + a.comments * 2)
+    );
+    const deepScanPosts = sorted.slice(0, 10);
+
+    console.log(`HN: Fetching comments for top ${deepScanPosts.length} posts...`);
+
+    await Promise.all(
+        deepScanPosts.map(async (post) => {
+            if (post.comments > 0) {
+                post.topComments = await fetchHNComments(post.id);
+            }
+        })
+    );
+
     return monthly;
 }
 

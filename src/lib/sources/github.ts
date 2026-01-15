@@ -132,7 +132,57 @@ export async function fetchGitHubPosts(query: string): Promise<RawPost[]> {
 
     console.log(`GitHub: Raw ${allPosts.length} → Filtered ${filtered.length} → Deduped ${deduped.length}`);
 
+    // Deep scan: Enrich top 10 posts with comments
+    const sorted = [...deduped].sort(
+        (a, b) => (b.score + b.comments * 2) - (a.score + a.comments * 2)
+    );
+    const deepScanPosts = sorted.slice(0, 10);
+
+    console.log(`GitHub: Fetching comments for top ${deepScanPosts.length} posts...`);
+
+    await Promise.all(
+        deepScanPosts.map(async (post) => {
+            if (post.comments > 0) {
+                post.topComments = await fetchGitHubComments(post.url);
+            }
+        })
+    );
+
     return deduped;
+}
+
+/**
+ * Fetch top comments for a GitHub issue
+ * Parses the html_url to extract owner/repo/issue_number
+ */
+async function fetchGitHubComments(issueUrl: string): Promise<string[]> {
+    // Parse URL like: https://github.com/owner/repo/issues/123
+    const match = issueUrl.match(/github\.com\/([^/]+)\/([^/]+)\/issues\/(\d+)/);
+    if (!match) return [];
+
+    const [, owner, repo, issueNumber] = match;
+    const url = `https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}/comments?per_page=5`;
+
+    try {
+        const response = await fetch(url, {
+            headers: {
+                "Accept": "application/vnd.github.v3+json",
+                "User-Agent": "PainPulse/1.0",
+            }
+        });
+
+        if (!response.ok) return [];
+
+        interface GitHubComment {
+            body: string;
+        }
+
+        const comments: GitHubComment[] = await response.json();
+        return comments.map(c => c.body);
+    } catch (error) {
+        console.error(`Failed to fetch GitHub comments for ${issueUrl}:`, error);
+        return [];
+    }
 }
 
 /**

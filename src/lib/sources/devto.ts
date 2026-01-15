@@ -108,7 +108,60 @@ export async function fetchDevToPosts(query: string): Promise<RawPost[]> {
 
     console.log(`Dev.to: Raw ${allPosts.length} → Filtered ${filtered.length} → Deduped ${deduped.length}`);
 
+    // Deep scan: Enrich top 10 posts with comments
+    const sorted = [...deduped].sort(
+        (a, b) => (b.score + b.comments * 2) - (a.score + a.comments * 2)
+    );
+    const deepScanPosts = sorted.slice(0, 10);
+
+    console.log(`Dev.to: Fetching comments for top ${deepScanPosts.length} posts...`);
+
+    await Promise.all(
+        deepScanPosts.map(async (post) => {
+            if (post.comments > 0) {
+                // Extract article ID from post.id (format: "devto-{id}")
+                const articleId = post.id.replace("devto-", "");
+                post.topComments = await fetchDevToComments(articleId);
+            }
+        })
+    );
+
     return deduped;
+}
+
+/**
+ * Fetch top comments for a Dev.to article
+ */
+async function fetchDevToComments(articleId: string): Promise<string[]> {
+    const url = `https://dev.to/api/comments?a_id=${articleId}`;
+
+    try {
+        const response = await fetch(url, {
+            headers: {
+                "Accept": "application/json",
+                "User-Agent": "PainPulse/1.0",
+            }
+        });
+
+        if (!response.ok) return [];
+
+        interface DevToComment {
+            body_html?: string;
+            children?: DevToComment[];
+        }
+
+        const comments: DevToComment[] = await response.json();
+
+        // Flatten top-level comments and extract text (strip HTML)
+        return comments
+            .slice(0, 5)
+            .map(c => c.body_html || "")
+            .map(html => html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim())
+            .filter(text => text.length > 10);
+    } catch (error) {
+        console.error(`Failed to fetch Dev.to comments for ${articleId}:`, error);
+        return [];
+    }
 }
 
 /**
