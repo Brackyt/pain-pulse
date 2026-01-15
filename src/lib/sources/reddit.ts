@@ -179,7 +179,7 @@ export async function fetchRedditPosts(query: string): Promise<RawPost[]> {
             await new Promise((resolve) => setTimeout(resolve, 500));
         }
 
-        const posts = await fetchRedditPage(q, "week");
+        const posts = await fetchRedditPage(q, "month");
 
         for (const post of posts) {
             if (!seenIds.has(post.id)) {
