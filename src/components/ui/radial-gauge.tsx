@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 interface RadialGaugeProps {
     value: number;
@@ -74,7 +74,7 @@ export function RadialGauge({
     // Animate the value
     useEffect(() => {
         if (!isVisible || !animated) {
-            setAnimatedValue(value);
+            setAnimatedValue(Number.isFinite(value) ? value : 0);
             return;
         }
 
@@ -96,9 +96,11 @@ export function RadialGauge({
         requestAnimationFrame(animate);
     }, [value, isVisible, animated]);
 
-    const percentage = animatedValue / maxValue;
+    const safeValue = Number.isFinite(animatedValue) ? animatedValue : 0;
+    const percentage = Math.min(Math.max(safeValue / maxValue, 0), 1);
     const strokeDashoffset = circumference * (1 - percentage);
-    const gradientId = `gauge-gradient-${type}-${Math.random().toString(36).substr(2, 9)}`;
+    const stableId = useId();
+    const gradientId = `gauge-gradient-${type}-${stableId}`;
 
     return (
         <div ref={ref} className={`relative inline-flex flex-col items-center ${className}`}>
@@ -168,7 +170,7 @@ export function RadialGauge({
             {/* Center text */}
             <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <span className={`text-3xl font-bold tabular-nums ${scheme.text}`}>
-                    {Math.round(animatedValue)}
+                    {Math.round(safeValue)}
                 </span>
                 {suffix && (
                     <span className="text-sm text-white/30">{suffix}</span>

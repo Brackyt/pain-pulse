@@ -78,10 +78,10 @@ export function PainSpikes({ spikes }: PainSpikesProps) {
                         <span className="text-white/40 text-sm">Week over Week</span>
                         <div
                             className={`flex items-center gap-2 text-lg font-bold px-3 py-1.5 rounded-xl ${deltaPercent > 0
-                                    ? "text-red-400 bg-red-500/10"
-                                    : deltaPercent < 0
-                                        ? "text-emerald-400 bg-emerald-500/10"
-                                        : "text-white/30 bg-white/5"
+                                ? "text-red-400 bg-red-500/10"
+                                : deltaPercent < 0
+                                    ? "text-emerald-400 bg-emerald-500/10"
+                                    : "text-white/30 bg-white/5"
                                 }`}
                         >
                             <span className="text-2xl">
@@ -98,14 +98,19 @@ export function PainSpikes({ spikes }: PainSpikesProps) {
     );
 }
 
-// Helper to generate trend visualization data
+// Helper to generate trend visualization data (deterministic for SSR)
 function generateTrendData(monthlyVolume: number, weeklyVolume: number): number[] {
     const points = 8;
     const data: number[] = [];
     const baseValue = monthlyVolume / 4;
 
+    // Use deterministic variations based on index + volume seed
+    // This ensures same values on server and client
+    const seed = monthlyVolume + weeklyVolume;
+    const variations = [0.15, -0.1, 0.05, -0.15, 0.2, -0.05, 0.1];
+
     for (let i = 0; i < points - 1; i++) {
-        const variation = Math.random() * 0.4 - 0.2;
+        const variation = variations[i % variations.length] * ((seed % 10) / 10 + 0.5);
         data.push(Math.max(1, Math.round(baseValue * (1 + variation))));
     }
 
